@@ -175,9 +175,10 @@ export function ImportExport({ students, academicYear, onImport }: Props) {
           <Upload className="h-6 w-6" />
         </div>
         <div className="flex-1">
-          <p className="font-medium">Drop a CSV here or click to upload</p>
+          <p className="font-medium">Drop a CSV or Excel file here, or click to upload</p>
           <p className="text-sm text-muted-foreground">
-            Bulk import to <span className="font-semibold text-foreground">{academicYear}</span>.{" "}
+            Supports <span className="font-medium text-foreground">.csv, .xlsx, .xls</span> · importing to{" "}
+            <span className="font-semibold text-foreground">{academicYear}</span>.{" "}
             <button
               type="button"
               onClick={(e) => {
@@ -193,7 +194,7 @@ export function ImportExport({ students, academicYear, onImport }: Props) {
         <input
           ref={fileRef}
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
