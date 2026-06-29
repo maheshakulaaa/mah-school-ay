@@ -44,38 +44,81 @@ export function ImportExport({ students, academicYear, onImport }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
+  const processRows = (raw: Record<string, unknown>[]) => {
+    const rows = raw
+      .map((r) => {
+        const get = (...keys: string[]) => {
+          for (const k of keys) {
+            const v = r[k];
+            if (v !== undefined && v !== null && String(v).trim() !== "") return String(v).trim();
+          }
+          return "";
+        };
+        let dob = get("DOB", "dob", "Date of Birth", "date_of_birth");
+        // Excel may give a serial number or a Date object
+        if (dob && /^\d+(\.\d+)?$/.test(dob)) {
+          const serial = Number(dob);
+          const parsed = XLSX.SSF.parse_date_code(serial);
+          if (parsed) {
+            const mm = String(parsed.m).padStart(2, "0");
+            const dd = String(parsed.d).padStart(2, "0");
+            dob = `${parsed.y}-${mm}-${dd}`;
+          }
+        } else if (dob) {
+          const d = new Date(dob);
+          if (!isNaN(d.getTime())) dob = d.toISOString().slice(0, 10);
+        }
+        const name = get("Name", "name", "Student Name");
+        if (!name) return null;
+        return {
+          academicYear,
+          name,
+          fatherName: get("Father Name", "fatherName", "Father's Name"),
+          gender: (get("Gender", "gender") || "Male") as Student["gender"],
+          aadhaar: get("Aadhaar", "aadhaar", "Aadhar"),
+          dob,
+          age: dob ? calculateAge(dob) : "",
+          className: get("Class", "className", "Grade"),
+          schoolName: get("School Name", "schoolName", "School"),
+          parentMobile: get("Parent Mobile", "parentMobile", "Mobile", "Phone"),
+        } satisfies Omit<Student, "id">;
+      })
+      .filter((r) => r !== null) as Omit<Student, "id">[];
+
+    if (!rows.length) {
+      toast.error("No valid rows found");
+      return;
+    }
+    onImport(rows);
+    toast.success(`Imported ${rows.length} student${rows.length === 1 ? "" : "s"}`);
+  };
+
   const handleFile = (file: File) => {
+    const name = file.name.toLowerCase();
+    const isExcel = name.endsWith(".xlsx") || name.endsWith(".xls");
+
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const wb = XLSX.read(data, { type: "array" });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
+          processRows(json);
+        } catch {
+          toast.error("Failed to parse Excel file");
+        }
+      };
+      reader.onerror = () => toast.error("Failed to read file");
+      reader.readAsArrayBuffer(file);
+      return;
+    }
+
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (result) => {
-        const rows = result.data
-          .map((r) => {
-            const dob = (r["DOB"] || r["dob"] || "").trim();
-            const name = (r["Name"] || r["name"] || "").trim();
-            if (!name) return null;
-            return {
-              academicYear,
-              name,
-              fatherName: (r["Father Name"] || r["fatherName"] || "").trim(),
-              gender: ((r["Gender"] || r["gender"] || "Male").trim() as Student["gender"]) || "Male",
-              aadhaar: (r["Aadhaar"] || r["aadhaar"] || "").trim(),
-              dob,
-              age: dob ? calculateAge(dob) : "",
-              className: (r["Class"] || r["className"] || "").trim(),
-              schoolName: (r["School Name"] || r["schoolName"] || "").trim(),
-              parentMobile: (r["Parent Mobile"] || r["parentMobile"] || "").trim(),
-            } satisfies Omit<Student, "id">;
-          })
-          .filter((r) => r !== null) as Omit<Student, "id">[];
-
-        if (!rows.length) {
-          toast.error("No valid rows found");
-          return;
-        }
-        onImport(rows);
-        toast.success(`Imported ${rows.length} student${rows.length === 1 ? "" : "s"}`);
-      },
+      complete: (result) => processRows(result.data),
       error: () => toast.error("Failed to parse CSV"),
     });
   };
