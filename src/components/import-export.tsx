@@ -67,7 +67,7 @@ export function ImportExport({ students, academicYear, onImport }: Props) {
               parentMobile: (r["Parent Mobile"] || r["parentMobile"] || "").trim(),
             } satisfies Omit<Student, "id">;
           })
-          .filter((r): r is Omit<Student, "id"> => r !== null);
+          .filter((r) => r !== null) as Omit<Student, "id">[];
 
         if (!rows.length) {
           toast.error("No valid rows found");
