@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { GraduationCap, Calendar, Plus, Users } from "lucide-react";
+import { GraduationCap, Calendar, Plus, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
