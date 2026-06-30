@@ -1,4 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export type Gender = "Male" | "Female" | "Other";
 
@@ -9,16 +11,12 @@ export interface Student {
   fatherName: string;
   gender: Gender | "";
   aadhaar: string;
-  dob: string; // YYYY-MM-DD
+  dob: string;
   age: number | "";
   className: string;
   schoolName: string;
   parentMobile: string;
 }
-
-const STORAGE_KEY = "tsr_students_v1";
-const YEARS_KEY = "tsr_years_v1";
-const ACTIVE_KEY = "tsr_active_year_v1";
 
 export const DEFAULT_YEARS = ["2024-25", "2025-26", "2026-27"];
 
@@ -33,123 +31,178 @@ export function calculateAge(dob: string): number | "" {
   return age < 0 ? "" : age;
 }
 
-function uid() {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+interface DbStudent {
+  id: string;
+  user_id: string;
+  academic_year: string;
+  name: string;
+  father_name: string;
+  gender: string;
+  aadhaar: string;
+  dob: string;
+  class_name: string;
+  school_name: string;
+  parent_mobile: string;
 }
 
-function load<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const v = localStorage.getItem(key);
-    return v ? (JSON.parse(v) as T) : fallback;
-  } catch {
-    return fallback;
-  }
+function fromDb(r: DbStudent): Student {
+  return {
+    id: r.id,
+    academicYear: r.academic_year,
+    name: r.name,
+    fatherName: r.father_name,
+    gender: (r.gender || "") as Student["gender"],
+    aadhaar: r.aadhaar,
+    dob: r.dob,
+    age: calculateAge(r.dob),
+    className: r.class_name,
+    schoolName: r.school_name,
+    parentMobile: r.parent_mobile,
+  };
 }
 
-function save(key: string, value: unknown) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(key, JSON.stringify(value));
+function toDb(s: Omit<Student, "id" | "age">, userId: string) {
+  return {
+    user_id: userId,
+    academic_year: s.academicYear,
+    name: s.name,
+    father_name: s.fatherName,
+    gender: s.gender,
+    aadhaar: s.aadhaar,
+    dob: s.dob,
+    class_name: s.className,
+    school_name: s.schoolName,
+    parent_mobile: s.parentMobile,
+  };
 }
 
-function seed(): Student[] {
-  const sample: Omit<Student, "id">[] = [
-    {
-      academicYear: "2025-26",
-      name: "Aarav Sharma",
-      fatherName: "Rohit Sharma",
-      gender: "Male",
-      aadhaar: "1234 5678 9012",
-      dob: "2014-05-12",
-      age: calculateAge("2014-05-12"),
-      className: "V",
-      schoolName: "Govt. Primary School, Sector 12",
-      parentMobile: "9876543210",
-    },
-    {
-      academicYear: "2025-26",
-      name: "Diya Verma",
-      fatherName: "Anil Verma",
-      gender: "Female",
-      aadhaar: "2345 6789 0123",
-      dob: "2013-09-03",
-      age: calculateAge("2013-09-03"),
-      className: "VI",
-      schoolName: "Govt. Primary School, Sector 12",
-      parentMobile: "9123456780",
-    },
-    {
-      academicYear: "2024-25",
-      name: "Karan Singh",
-      fatherName: "Pritam Singh",
-      gender: "Male",
-      aadhaar: "3456 7890 1234",
-      dob: "2012-01-20",
-      age: calculateAge("2012-01-20"),
-      className: "VII",
-      schoolName: "Govt. Primary School, Sector 12",
-      parentMobile: "9988776655",
-    },
-  ];
-  return sample.map((s) => ({ ...s, id: uid() }));
+function patchToDb(p: Partial<Student>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (p.academicYear !== undefined) out.academic_year = p.academicYear;
+  if (p.name !== undefined) out.name = p.name;
+  if (p.fatherName !== undefined) out.father_name = p.fatherName;
+  if (p.gender !== undefined) out.gender = p.gender;
+  if (p.aadhaar !== undefined) out.aadhaar = p.aadhaar;
+  if (p.dob !== undefined) out.dob = p.dob;
+  if (p.className !== undefined) out.class_name = p.className;
+  if (p.schoolName !== undefined) out.school_name = p.schoolName;
+  if (p.parentMobile !== undefined) out.parent_mobile = p.parentMobile;
+  return out;
 }
 
 export function useStudentsStore() {
+  const [userId, setUserId] = useState<string | null>(null);
   const [years, setYears] = useState<string[]>(DEFAULT_YEARS);
   const [activeYear, setActiveYearState] = useState<string>("2025-26");
   const [students, setStudents] = useState<Student[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    const y = load<string[]>(YEARS_KEY, DEFAULT_YEARS);
-    const a = load<string>(ACTIVE_KEY, "2025-26");
-    let s = load<Student[] | null>(STORAGE_KEY, null);
-    if (!s) {
-      s = seed();
-      save(STORAGE_KEY, s);
-    }
-    setYears(y);
-    setActiveYearState(a);
-    setStudents(s);
-    setHydrated(true);
-  }, []);
+    let mounted = true;
+    (async () => {
+      const { data: userRes } = await supabase.auth.getUser();
+      const uid = userRes.user?.id ?? null;
+      if (!mounted) return;
+      setUserId(uid);
+      if (!uid) {
+        setHydrated(true);
+        return;
+      }
 
-  useEffect(() => {
-    if (hydrated) save(STORAGE_KEY, students);
-  }, [students, hydrated]);
-  useEffect(() => {
-    if (hydrated) save(YEARS_KEY, years);
-  }, [years, hydrated]);
-  useEffect(() => {
-    if (hydrated) save(ACTIVE_KEY, activeYear);
-  }, [activeYear, hydrated]);
+      // Load years
+      const { data: yearRows } = await supabase
+        .from("academic_years")
+        .select("year")
+        .order("year");
+      let ylist = (yearRows ?? []).map((r: { year: string }) => r.year);
+      if (ylist.length === 0) {
+        // seed defaults for this user
+        await supabase
+          .from("academic_years")
+          .insert(DEFAULT_YEARS.map((year) => ({ user_id: uid, year })));
+        ylist = [...DEFAULT_YEARS];
+      }
+
+      const { data: studentRows } = await supabase
+        .from("students")
+        .select("*")
+        .order("created_at", { ascending: true });
+
+      if (!mounted) return;
+      setYears(ylist);
+      setActiveYearState(ylist.includes("2025-26") ? "2025-26" : ylist[0]);
+      setStudents((studentRows ?? []).map((r) => fromDb(r as DbStudent)));
+      setHydrated(true);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const setActiveYear = useCallback((y: string) => setActiveYearState(y), []);
 
-  const addYear = useCallback((y: string) => {
-    setYears((prev) => (prev.includes(y) ? prev : [...prev, y].sort()));
-  }, []);
+  const addYear = useCallback(
+    async (y: string) => {
+      if (!userId) return;
+      if (years.includes(y)) return;
+      const { error } = await supabase.from("academic_years").insert({ user_id: userId, year: y });
+      if (error) return toast.error(error.message);
+      setYears((prev) => [...prev, y].sort());
+    },
+    [userId, years],
+  );
 
-  const addStudent = useCallback((s: Omit<Student, "id">) => {
-    setStudents((prev) => [...prev, { ...s, id: uid() }]);
-  }, []);
+  const addStudent = useCallback(
+    async (s: Omit<Student, "id">) => {
+      if (!userId) return;
+      const { data, error } = await supabase
+        .from("students")
+        .insert(toDb(s, userId))
+        .select()
+        .single();
+      if (error) return toast.error(error.message);
+      setStudents((prev) => [...prev, fromDb(data as DbStudent)]);
+    },
+    [userId],
+  );
 
-  const addStudents = useCallback((arr: Omit<Student, "id">[]) => {
-    setStudents((prev) => [...prev, ...arr.map((s) => ({ ...s, id: uid() }))]);
-  }, []);
+  const addStudents = useCallback(
+    async (arr: Omit<Student, "id">[]) => {
+      if (!userId || !arr.length) return;
+      const { data, error } = await supabase
+        .from("students")
+        .insert(arr.map((s) => toDb(s, userId)))
+        .select();
+      if (error) return toast.error(error.message);
+      setStudents((prev) => [...prev, ...((data ?? []) as DbStudent[]).map(fromDb)]);
+    },
+    [userId],
+  );
 
-  const updateStudent = useCallback((id: string, patch: Partial<Student>) => {
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id !== id) return s;
-        const next = { ...s, ...patch };
-        if (patch.dob !== undefined) next.age = calculateAge(next.dob);
-        return next;
-      }),
-    );
-  }, []);
+  const updateStudent = useCallback(
+    async (id: string, patch: Partial<Student>) => {
+      const dbPatch = patchToDb(patch);
+      const prevSnap = students;
+      setStudents((prev) =>
+        prev.map((s) => {
+          if (s.id !== id) return s;
+          const next = { ...s, ...patch };
+          if (patch.dob !== undefined) next.age = calculateAge(next.dob);
+          return next;
+        }),
+      );
+      const { error } = await supabase.from("students").update(dbPatch).eq("id", id);
+      if (error) {
+        toast.error(error.message);
+        setStudents(prevSnap);
+      }
+    },
+    [students],
+  );
 
-  const deleteStudent = useCallback((id: string) => {
+  const deleteStudent = useCallback(async (id: string) => {
+    const { error } = await supabase.from("students").delete().eq("id", id);
+    if (error) return toast.error(error.message);
     setStudents((prev) => prev.filter((s) => s.id !== id));
   }, []);
 
