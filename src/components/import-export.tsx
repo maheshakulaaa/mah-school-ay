@@ -119,42 +119,87 @@ export function ImportExport({ students, academicYear, onImport }: Props) {
   const [dragging, setDragging] = useState(false);
 
   const processRows = (raw: Record<string, unknown>[]) => {
+    const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+
     const rows = raw
       .map((r) => {
+        const lookup = new Map<string, string>();
+        for (const [k, v] of Object.entries(r)) {
+          if (v === undefined || v === null) continue;
+          const s = String(v).trim();
+          if (!s) continue;
+          lookup.set(norm(k), s);
+        }
         const get = (...keys: string[]) => {
           for (const k of keys) {
-            const v = r[k];
-            if (v !== undefined && v !== null && String(v).trim() !== "") return String(v).trim();
+            const v = lookup.get(norm(k));
+            if (v) return v;
           }
           return "";
         };
-        let dob = get("DOB", "dob", "Date of Birth", "date_of_birth");
-        // Excel may give a serial number or a Date object
+        const find = (...needles: string[]) => {
+          for (const [k, v] of lookup) {
+            if (needles.some((n) => k.includes(norm(n)))) return v;
+          }
+          return "";
+        };
+
+        let dob = get("DOB", "Date of Birth") || find("date of birth", "dob");
         if (dob && /^\d+(\.\d+)?$/.test(dob)) {
-          const serial = Number(dob);
-          const parsed = XLSX.SSF.parse_date_code(serial);
+          const parsed = XLSX.SSF.parse_date_code(Number(dob));
           if (parsed) {
             const mm = String(parsed.m).padStart(2, "0");
             const dd = String(parsed.d).padStart(2, "0");
             dob = `${parsed.y}-${mm}-${dd}`;
           }
         } else if (dob) {
-          const d = new Date(dob);
-          if (!isNaN(d.getTime())) dob = d.toISOString().slice(0, 10);
+          const m = dob.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+          if (m) {
+            const dd = m[1].padStart(2, "0");
+            const mm = m[2].padStart(2, "0");
+            let yyyy = m[3];
+            if (yyyy.length === 2) yyyy = (Number(yyyy) > 50 ? "19" : "20") + yyyy;
+            dob = `${yyyy}-${mm}-${dd}`;
+          } else {
+            const d = new Date(dob);
+            if (!isNaN(d.getTime())) dob = d.toISOString().slice(0, 10);
+          }
         }
-        const name = get("Name", "name", "Student Name");
+
+        const name =
+          get("Name", "Student Name", "Name of the Student (Full Name)") ||
+          find("name of the student", "student name", "full name") ||
+          lookup.get("name") || "";
         if (!name) return null;
+
+        const genderRaw = get("Gender") || find("gender");
+        const g = genderRaw.toLowerCase();
+        const gender: Student["gender"] =
+          g.startsWith("f") || g.startsWith("g")
+            ? "Female"
+            : g.startsWith("m") || g.startsWith("b")
+            ? "Male"
+            : g
+            ? "Other"
+            : "Male";
+
+        const aadhaar = (get("Aadhaar", "Aadhar") || find("aadhaar", "aadhar")).replace(/\s+/g, "");
+
         return {
           academicYear,
           name,
-          fatherName: get("Father Name", "fatherName", "Father's Name"),
-          gender: (get("Gender", "gender") || "Male") as Student["gender"],
-          aadhaar: get("Aadhaar", "aadhaar", "Aadhar"),
+          fatherName: get("Father Name", "Father's Name") || find("father"),
+          gender,
+          aadhaar,
           dob,
           age: dob ? calculateAge(dob) : "",
-          className: get("Class", "className", "Grade"),
-          schoolName: get("School Name", "schoolName", "School"),
-          parentMobile: get("Parent Mobile", "parentMobile", "Mobile", "Phone"),
+          className: get("Class", "Grade") || find("class", "grade"),
+          schoolName:
+            get("School Name", "Name of the Studying School") ||
+            find("studying school", "school name", "school"),
+          parentMobile:
+            get("Parent Mobile", "Parent Mobile No.", "Mobile", "Phone") ||
+            find("parent mobile", "mobile", "phone"),
         } satisfies Omit<Student, "id">;
       })
       .filter((r) => r !== null) as Omit<Student, "id">[];
@@ -175,12 +220,13 @@ export function ImportExport({ students, academicYear, onImport }: Props) {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const wb = XLSX.read(data, { type: "array" });
+          const raw = new Uint8Array(e.target?.result as ArrayBuffer);
+          const data = sanitizeXlsxBuffer(raw);
+          const wb = XLSX.read(data, { type: "array", cellDates: false });
           const ws = wb.Sheets[wb.SheetNames[0]];
-          const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
-          processRows(json);
-        } catch {
+          processRows(rowsFromSheet(ws));
+        } catch (err) {
+          console.error(err);
           toast.error("Failed to parse Excel file");
         }
       };
