@@ -9,10 +9,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
-import { Plus, BookOpen, LogOut, Shield } from "lucide-react";
+import { Plus, BookOpen, LogOut, Shield, Copy } from "lucide-react";
 import { YearSidebar } from "@/components/year-sidebar";
 import { StudentsTable } from "@/components/students-table";
 import { StudentFormDialog } from "@/components/student-form-dialog";
+import { CopyYearDialog } from "@/components/copy-year-dialog";
 import { ImportExport } from "@/components/import-export";
 import { useStudentsStore } from "@/lib/students-store";
 import { useCurrentUser } from "@/lib/use-current-user";
