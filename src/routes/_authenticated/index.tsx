@@ -107,6 +107,14 @@ function Portal() {
             <Button variant="outline" onClick={signOut}>
               <LogOut className="h-4 w-4" /> Sign out
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => setCopyOpen(true)}
+              disabled={store.years.length < 2}
+              title="Copy a previous year's roster into the current year"
+            >
+              <Copy className="h-4 w-4" /> Copy from year
+            </Button>
             <Button onClick={() => setAddOpen(true)}>
               <Plus className="h-4 w-4" /> Add Student
             </Button>
