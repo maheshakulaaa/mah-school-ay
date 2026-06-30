@@ -144,6 +144,14 @@ function Portal() {
         academicYear={store.activeYear}
         onSubmit={store.addStudent}
       />
+      <CopyYearDialog
+        open={copyOpen}
+        onOpenChange={setCopyOpen}
+        years={store.years}
+        activeYear={store.activeYear}
+        counts={counts}
+        onCopy={store.copyYear}
+      />
       <Toaster richColors position="top-right" />
     </div>
   );
