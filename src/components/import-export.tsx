@@ -1,11 +1,85 @@
 import { useRef, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
+import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Upload, Download, FileSpreadsheet, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { calculateAge, type Student } from "@/lib/students-store";
+
+// SheetJS 0.18.5 has a regex bug where <si > / </si > (with whitespace)
+// in sharedStrings.xml don't match, leaving all strings undefined.
+// Pre-clean the zip so string cells parse correctly.
+function sanitizeXlsxBuffer(buf: Uint8Array): Uint8Array {
+  try {
+    const files = unzipSync(buf);
+    let touched = false;
+    for (const path of Object.keys(files)) {
+      if (!/sharedStrings\.xml$|sheet\d+\.xml$/i.test(path)) continue;
+      const xml = strFromU8(files[path]);
+      const fixed = xml
+        .replace(/<si(\s+[^>]*)?\s*>/g, "<si>")
+        .replace(/<\/si\s*>/g, "</si>")
+        .replace(/<t(\s+[^>]*)?\s*>/g, (m, attrs) => (attrs ? `<t${attrs}>` : "<t>"))
+        .replace(/<\/t\s*>/g, "</t>");
+      if (fixed !== xml) {
+        files[path] = strToU8(fixed);
+        touched = true;
+      }
+    }
+    return touched ? zipSync(files) : buf;
+  } catch {
+    return buf;
+  }
+}
+
+// Detect the header row by scanning the first ~10 rows for known field keywords,
+// then return objects keyed by those detected headers.
+function rowsFromSheet(ws: XLSX.WorkSheet): Record<string, unknown>[] {
+  const grid = XLSX.utils.sheet_to_json<unknown[]>(ws, {
+    header: 1,
+    defval: "",
+    raw: false,
+    blankrows: false,
+  });
+  if (!grid.length) return [];
+
+  const KEYWORDS = ["name", "father", "gender", "aadhaar", "aadhar", "dob", "date of birth", "mobile", "class"];
+  let headerIdx = 0;
+  let bestScore = 0;
+  const scan = Math.min(grid.length, 10);
+  for (let i = 0; i < scan; i++) {
+    const row = grid[i] || [];
+    const score = row.reduce<number>((acc, cell) => {
+      const s = String(cell ?? "").toLowerCase().trim();
+      if (!s) return acc;
+      return acc + (KEYWORDS.some((k) => s.includes(k)) ? 1 : 0);
+    }, 0);
+    if (score > bestScore) {
+      bestScore = score;
+      headerIdx = i;
+    }
+  }
+
+  const headerRow = (grid[headerIdx] || []).map((c) => String(c ?? "").replace(/\s+/g, " ").trim());
+  const seen = new Map<string, number>();
+  const headers = headerRow.map((h, i) => {
+    if (!h) return `__col_${i}`;
+    const key = h;
+    const n = seen.get(key) ?? 0;
+    seen.set(key, n + 1);
+    return n === 0 ? key : `${key} (${n + 1})`;
+  });
+
+  return grid.slice(headerIdx + 1).map((row) => {
+    const obj: Record<string, unknown> = {};
+    headers.forEach((h, i) => {
+      obj[h] = row[i];
+    });
+    return obj;
+  });
+}
 
 interface Props {
   students: Student[];
@@ -45,42 +119,87 @@ export function ImportExport({ students, academicYear, onImport }: Props) {
   const [dragging, setDragging] = useState(false);
 
   const processRows = (raw: Record<string, unknown>[]) => {
+    const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+
     const rows = raw
       .map((r) => {
+        const lookup = new Map<string, string>();
+        for (const [k, v] of Object.entries(r)) {
+          if (v === undefined || v === null) continue;
+          const s = String(v).trim();
+          if (!s) continue;
+          lookup.set(norm(k), s);
+        }
         const get = (...keys: string[]) => {
           for (const k of keys) {
-            const v = r[k];
-            if (v !== undefined && v !== null && String(v).trim() !== "") return String(v).trim();
+            const v = lookup.get(norm(k));
+            if (v) return v;
           }
           return "";
         };
-        let dob = get("DOB", "dob", "Date of Birth", "date_of_birth");
-        // Excel may give a serial number or a Date object
+        const find = (...needles: string[]) => {
+          for (const [k, v] of lookup) {
+            if (needles.some((n) => k.includes(norm(n)))) return v;
+          }
+          return "";
+        };
+
+        let dob = get("DOB", "Date of Birth") || find("date of birth", "dob");
         if (dob && /^\d+(\.\d+)?$/.test(dob)) {
-          const serial = Number(dob);
-          const parsed = XLSX.SSF.parse_date_code(serial);
+          const parsed = XLSX.SSF.parse_date_code(Number(dob));
           if (parsed) {
             const mm = String(parsed.m).padStart(2, "0");
             const dd = String(parsed.d).padStart(2, "0");
             dob = `${parsed.y}-${mm}-${dd}`;
           }
         } else if (dob) {
-          const d = new Date(dob);
-          if (!isNaN(d.getTime())) dob = d.toISOString().slice(0, 10);
+          const m = dob.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+          if (m) {
+            const dd = m[1].padStart(2, "0");
+            const mm = m[2].padStart(2, "0");
+            let yyyy = m[3];
+            if (yyyy.length === 2) yyyy = (Number(yyyy) > 50 ? "19" : "20") + yyyy;
+            dob = `${yyyy}-${mm}-${dd}`;
+          } else {
+            const d = new Date(dob);
+            if (!isNaN(d.getTime())) dob = d.toISOString().slice(0, 10);
+          }
         }
-        const name = get("Name", "name", "Student Name");
+
+        const name =
+          get("Name", "Student Name", "Name of the Student (Full Name)") ||
+          find("name of the student", "student name", "full name") ||
+          lookup.get("name") || "";
         if (!name) return null;
+
+        const genderRaw = get("Gender") || find("gender");
+        const g = genderRaw.toLowerCase();
+        const gender: Student["gender"] =
+          g.startsWith("f") || g.startsWith("g")
+            ? "Female"
+            : g.startsWith("m") || g.startsWith("b")
+            ? "Male"
+            : g
+            ? "Other"
+            : "Male";
+
+        const aadhaar = (get("Aadhaar", "Aadhar") || find("aadhaar", "aadhar")).replace(/\s+/g, "");
+
         return {
           academicYear,
           name,
-          fatherName: get("Father Name", "fatherName", "Father's Name"),
-          gender: (get("Gender", "gender") || "Male") as Student["gender"],
-          aadhaar: get("Aadhaar", "aadhaar", "Aadhar"),
+          fatherName: get("Father Name", "Father's Name") || find("father"),
+          gender,
+          aadhaar,
           dob,
           age: dob ? calculateAge(dob) : "",
-          className: get("Class", "className", "Grade"),
-          schoolName: get("School Name", "schoolName", "School"),
-          parentMobile: get("Parent Mobile", "parentMobile", "Mobile", "Phone"),
+          className: get("Class", "Grade") || find("class", "grade"),
+          schoolName:
+            get("School Name", "Name of the Studying School") ||
+            find("studying school", "school name", "school"),
+          parentMobile:
+            get("Parent Mobile", "Parent Mobile No.", "Mobile", "Phone") ||
+            find("parent mobile", "mobile", "phone"),
         } satisfies Omit<Student, "id">;
       })
       .filter((r) => r !== null) as Omit<Student, "id">[];
@@ -101,12 +220,13 @@ export function ImportExport({ students, academicYear, onImport }: Props) {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const wb = XLSX.read(data, { type: "array" });
+          const raw = new Uint8Array(e.target?.result as ArrayBuffer);
+          const data = sanitizeXlsxBuffer(raw);
+          const wb = XLSX.read(data, { type: "array", cellDates: false });
           const ws = wb.Sheets[wb.SheetNames[0]];
-          const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
-          processRows(json);
-        } catch {
+          processRows(rowsFromSheet(ws));
+        } catch (err) {
+          console.error(err);
           toast.error("Failed to parse Excel file");
         }
       };
