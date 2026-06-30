@@ -209,6 +209,72 @@ export function useStudentsStore() {
     setStudents((prev) => prev.filter((s) => s.id !== id));
   }, []);
 
+  const copyYear = useCallback(
+    async (fromYear: string, toYear: string) => {
+      if (!userId) return 0;
+      if (fromYear === toYear) {
+        toast.error("Source and target years are the same");
+        return 0;
+      }
+      const source = students.filter((s) => s.academicYear === fromYear);
+      if (!source.length) {
+        toast.error(`No students in ${fromYear} to copy`);
+        return 0;
+      }
+      const existingAadhaars = new Set(
+        students.filter((s) => s.academicYear === toYear && s.aadhaar).map((s) => s.aadhaar),
+      );
+      const existingNames = new Set(
+        students
+          .filter((s) => s.academicYear === toYear)
+          .map((s) => `${s.name}|${s.dob}`.toLowerCase()),
+      );
+      const toInsert = source
+        .filter((s) => {
+          if (s.aadhaar && existingAadhaars.has(s.aadhaar)) return false;
+          if (existingNames.has(`${s.name}|${s.dob}`.toLowerCase())) return false;
+          return true;
+        })
+        .map(
+          (s) =>
+            ({
+              academicYear: toYear,
+              name: s.name,
+              fatherName: s.fatherName,
+              gender: s.gender,
+              aadhaar: s.aadhaar,
+              dob: s.dob,
+              age: calculateAge(s.dob),
+              className: s.className,
+              schoolName: s.schoolName,
+              parentMobile: s.parentMobile,
+            }) satisfies Omit<Student, "id">,
+        );
+
+      if (!toInsert.length) {
+        toast.info("Every student from that year already exists in the target year");
+        return 0;
+      }
+
+      const { data, error } = await supabase
+        .from("students")
+        .insert(toInsert.map((s) => toDb(s, userId)))
+        .select();
+      if (error) {
+        toast.error(error.message);
+        return 0;
+      }
+      setStudents((prev) => [...prev, ...((data ?? []) as DbStudent[]).map(fromDb)]);
+      const skipped = source.length - toInsert.length;
+      toast.success(
+        `Copied ${toInsert.length} student${toInsert.length === 1 ? "" : "s"} to ${toYear}` +
+          (skipped ? ` (skipped ${skipped} duplicate${skipped === 1 ? "" : "s"})` : ""),
+      );
+      return toInsert.length;
+    },
+    [userId, students],
+  );
+
   const filtered = students.filter((s) => s.academicYear === activeYear);
 
   return {
@@ -223,5 +289,6 @@ export function useStudentsStore() {
     addStudents,
     updateStudent,
     deleteStudent,
+    copyYear,
   };
 }

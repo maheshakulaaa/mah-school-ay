@@ -9,10 +9,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
-import { Plus, BookOpen, LogOut, Shield } from "lucide-react";
+import { Plus, BookOpen, LogOut, Shield, Copy } from "lucide-react";
 import { YearSidebar } from "@/components/year-sidebar";
 import { StudentsTable } from "@/components/students-table";
 import { StudentFormDialog } from "@/components/student-form-dialog";
+import { CopyYearDialog } from "@/components/copy-year-dialog";
 import { ImportExport } from "@/components/import-export";
 import { useStudentsStore } from "@/lib/students-store";
 import { useCurrentUser } from "@/lib/use-current-user";
@@ -38,6 +39,7 @@ function Portal() {
   const { user } = useCurrentUser();
   const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
 
   const counts = useMemo(() => {
     const m: Record<string, number> = {};
@@ -105,6 +107,14 @@ function Portal() {
             <Button variant="outline" onClick={signOut}>
               <LogOut className="h-4 w-4" /> Sign out
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => setCopyOpen(true)}
+              disabled={store.years.length < 2}
+              title="Copy a previous year's roster into the current year"
+            >
+              <Copy className="h-4 w-4" /> Copy from year
+            </Button>
             <Button onClick={() => setAddOpen(true)}>
               <Plus className="h-4 w-4" /> Add Student
             </Button>
@@ -133,6 +143,14 @@ function Portal() {
         onOpenChange={setAddOpen}
         academicYear={store.activeYear}
         onSubmit={store.addStudent}
+      />
+      <CopyYearDialog
+        open={copyOpen}
+        onOpenChange={setCopyOpen}
+        years={store.years}
+        activeYear={store.activeYear}
+        counts={counts}
+        onCopy={store.copyYear}
       />
       <Toaster richColors position="top-right" />
     </div>
