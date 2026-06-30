@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,14 +9,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
-import { Plus, BookOpen } from "lucide-react";
+import { Plus, BookOpen, LogOut, Shield } from "lucide-react";
 import { YearSidebar } from "@/components/year-sidebar";
 import { StudentsTable } from "@/components/students-table";
 import { StudentFormDialog } from "@/components/student-form-dialog";
 import { ImportExport } from "@/components/import-export";
 import { useStudentsStore } from "@/lib/students-store";
+import { useCurrentUser } from "@/lib/use-current-user";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "Teacher's Student Register Portal" },
@@ -25,11 +28,6 @@ export const Route = createFileRoute("/")({
         content:
           "Manage student records across academic years with inline editing, CSV import, and Excel export.",
       },
-      { property: "og:title", content: "Teacher's Student Register Portal" },
-      {
-        property: "og:description",
-        content: "A clean register portal for teachers to manage student records by academic year.",
-      },
     ],
   }),
   component: Portal,
@@ -37,6 +35,8 @@ export const Route = createFileRoute("/")({
 
 function Portal() {
   const store = useStudentsStore();
+  const { user } = useCurrentUser();
+  const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
 
   const counts = useMemo(() => {
@@ -45,6 +45,12 @@ function Portal() {
     for (const s of store.students) m[s.academicYear] = (m[s.academicYear] ?? 0) + 1;
     return m;
   }, [store.students, store.years]);
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    toast.success("Signed out");
+    navigate({ to: "/auth" });
+  };
 
   if (!store.hydrated) {
     return (
@@ -75,7 +81,7 @@ function Portal() {
               Students · {store.activeYear}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              View, edit, and manage your class register for the selected academic year.
+              {user?.fullName ? `Signed in as ${user.fullName}` : user?.email}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -86,16 +92,21 @@ function Portal() {
                 </SelectTrigger>
                 <SelectContent>
                   {store.years.map((y) => (
-                    <SelectItem key={y} value={y}>
-                      {y}
-                    </SelectItem>
+                    <SelectItem key={y} value={y}>{y}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+            {user?.isAdmin && (
+              <Button asChild variant="outline">
+                <Link to="/admin"><Shield className="h-4 w-4" /> Admin</Link>
+              </Button>
+            )}
+            <Button variant="outline" onClick={signOut}>
+              <LogOut className="h-4 w-4" /> Sign out
+            </Button>
             <Button onClick={() => setAddOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Add Student
+              <Plus className="h-4 w-4" /> Add Student
             </Button>
           </div>
         </header>
