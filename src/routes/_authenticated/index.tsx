@@ -39,6 +39,7 @@ function Portal() {
   const { user } = useCurrentUser();
   const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
 
   const counts = useMemo(() => {
     const m: Record<string, number> = {};
