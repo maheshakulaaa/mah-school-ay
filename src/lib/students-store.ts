@@ -191,7 +191,10 @@ export function useStudentsStore() {
           return next;
         }),
       );
-      const { error } = await supabase.from("students").update(dbPatch).eq("id", id);
+      const { error } = await supabase
+        .from("students")
+        .update(dbPatch as never)
+        .eq("id", id);
       if (error) {
         toast.error(error.message);
         setStudents(prevSnap);
