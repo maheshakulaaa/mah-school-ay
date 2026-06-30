@@ -1,11 +1,85 @@
 import { useRef, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
+import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Upload, Download, FileSpreadsheet, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { calculateAge, type Student } from "@/lib/students-store";
+
+// SheetJS 0.18.5 has a regex bug where <si > / </si > (with whitespace)
+// in sharedStrings.xml don't match, leaving all strings undefined.
+// Pre-clean the zip so string cells parse correctly.
+function sanitizeXlsxBuffer(buf: Uint8Array): Uint8Array {
+  try {
+    const files = unzipSync(buf);
+    let touched = false;
+    for (const path of Object.keys(files)) {
+      if (!/sharedStrings\.xml$|sheet\d+\.xml$/i.test(path)) continue;
+      const xml = strFromU8(files[path]);
+      const fixed = xml
+        .replace(/<si(\s+[^>]*)?\s*>/g, "<si>")
+        .replace(/<\/si\s*>/g, "</si>")
+        .replace(/<t(\s+[^>]*)?\s*>/g, (m, attrs) => (attrs ? `<t${attrs}>` : "<t>"))
+        .replace(/<\/t\s*>/g, "</t>");
+      if (fixed !== xml) {
+        files[path] = strToU8(fixed);
+        touched = true;
+      }
+    }
+    return touched ? zipSync(files) : buf;
+  } catch {
+    return buf;
+  }
+}
+
+// Detect the header row by scanning the first ~10 rows for known field keywords,
+// then return objects keyed by those detected headers.
+function rowsFromSheet(ws: XLSX.WorkSheet): Record<string, unknown>[] {
+  const grid = XLSX.utils.sheet_to_json<unknown[]>(ws, {
+    header: 1,
+    defval: "",
+    raw: false,
+    blankrows: false,
+  });
+  if (!grid.length) return [];
+
+  const KEYWORDS = ["name", "father", "gender", "aadhaar", "aadhar", "dob", "date of birth", "mobile", "class"];
+  let headerIdx = 0;
+  let bestScore = 0;
+  const scan = Math.min(grid.length, 10);
+  for (let i = 0; i < scan; i++) {
+    const row = grid[i] || [];
+    const score = row.reduce<number>((acc, cell) => {
+      const s = String(cell ?? "").toLowerCase().trim();
+      if (!s) return acc;
+      return acc + (KEYWORDS.some((k) => s.includes(k)) ? 1 : 0);
+    }, 0);
+    if (score > bestScore) {
+      bestScore = score;
+      headerIdx = i;
+    }
+  }
+
+  const headerRow = (grid[headerIdx] || []).map((c) => String(c ?? "").replace(/\s+/g, " ").trim());
+  const seen = new Map<string, number>();
+  const headers = headerRow.map((h, i) => {
+    if (!h) return `__col_${i}`;
+    const key = h;
+    const n = seen.get(key) ?? 0;
+    seen.set(key, n + 1);
+    return n === 0 ? key : `${key} (${n + 1})`;
+  });
+
+  return grid.slice(headerIdx + 1).map((row) => {
+    const obj: Record<string, unknown> = {};
+    headers.forEach((h, i) => {
+      obj[h] = row[i];
+    });
+    return obj;
+  });
+}
 
 interface Props {
   students: Student[];
