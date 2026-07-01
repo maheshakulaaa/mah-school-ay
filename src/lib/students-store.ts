@@ -384,7 +384,10 @@ export function useStudentsStore() {
       const col = columns.find((c) => c.id === id);
       if (!col) return;
       const { error } = await supabase.from("student_columns").delete().eq("id", id);
-      if (error) return toast.error(error.message);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
       setColumns((prev) => prev.filter((c) => c.id !== id));
       toast.success(`Column "${col.label}" removed`);
     },
