@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { z } from "zod";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,69 +17,64 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { calculateAge, type Student } from "@/lib/students-store";
+import { calculateAge, type StudentColumn } from "@/lib/students-store";
 import { toast } from "sonner";
-
-const schema = z.object({
-  name: z.string().trim().min(1, "Name required").max(100),
-  fatherName: z.string().trim().min(1, "Father's name required").max(100),
-  gender: z.enum(["Male", "Female", "Other"]),
-  aadhaar: z
-    .string()
-    .trim()
-    .regex(/^[0-9 ]{0,20}$/, "Digits only")
-    .max(20),
-  dob: z.string().min(1, "DOB required"),
-  className: z.string().trim().min(1, "Class required").max(20),
-  schoolName: z.string().trim().min(1, "School required").max(150),
-  parentMobile: z
-    .string()
-    .trim()
-    .regex(/^[0-9+\- ]{7,20}$/, "Invalid mobile"),
-});
 
 interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   academicYear: string;
-  onSubmit: (s: Omit<Student, "id">) => void;
+  columns: StudentColumn[];
+  onSubmit: (data: Record<string, string>) => void;
 }
 
-const empty = {
-  name: "",
-  fatherName: "",
-  gender: "Male" as const,
-  aadhaar: "",
-  dob: "",
-  className: "",
-  schoolName: "",
-  parentMobile: "",
-};
+export function StudentFormDialog({ open, onOpenChange, academicYear, columns, onSubmit }: Props) {
+  const sorted = useMemo(
+    () => [...columns].sort((a, b) => a.position - b.position),
+    [columns],
+  );
 
-export function StudentFormDialog({ open, onOpenChange, academicYear, onSubmit }: Props) {
-  const [form, setForm] = useState(empty);
+  const [form, setForm] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (open) setForm(empty);
-  }, [open]);
+    if (open) {
+      const empty: Record<string, string> = {};
+      for (const c of sorted) empty[c.key] = "";
+      setForm(empty);
+    }
+  }, [open, sorted]);
 
-  const age = calculateAge(form.dob);
+  const setField = (key: string, val: string) => {
+    setForm((f) => {
+      const next = { ...f, [key]: val };
+      if (key === "dob") {
+        const a = calculateAge(val);
+        if (a !== "" && "age" in next) next.age = String(a);
+      }
+      return next;
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const parsed = schema.safeParse(form);
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
+    const nameCol = sorted.find((c) => c.key === "name") ?? sorted[0];
+    if (nameCol && !(form[nameCol.key] ?? "").trim()) {
+      toast.error(`${nameCol.label} is required`);
       return;
     }
-    onSubmit({ ...parsed.data, age, academicYear });
+    const clean: Record<string, string> = {};
+    for (const [k, v] of Object.entries(form)) {
+      const trimmed = (v ?? "").trim();
+      if (trimmed) clean[k] = trimmed;
+    }
+    onSubmit(clean);
     toast.success("Student added");
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Student</DialogTitle>
           <DialogDescription>
@@ -88,78 +82,14 @@ export function StudentFormDialog({ open, onOpenChange, academicYear, onSubmit }
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="name">Name</Label>
-            <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="fatherName">Father's Name</Label>
-            <Input
-              id="fatherName"
-              value={form.fatherName}
-              onChange={(e) => setForm({ ...form, fatherName: e.target.value })}
+          {sorted.map((c) => (
+            <FieldControl
+              key={c.id}
+              col={c}
+              value={form[c.key] ?? ""}
+              onChange={(v) => setField(c.key, v)}
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Gender</Label>
-            <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v as "Male" })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Male">Male</SelectItem>
-                <SelectItem value="Female">Female</SelectItem>
-                <SelectItem value="Other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="aadhaar">Aadhaar</Label>
-            <Input
-              id="aadhaar"
-              value={form.aadhaar}
-              onChange={(e) => setForm({ ...form, aadhaar: e.target.value })}
-              placeholder="XXXX XXXX XXXX"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="dob">Date of Birth</Label>
-            <Input
-              id="dob"
-              type="date"
-              value={form.dob}
-              onChange={(e) => setForm({ ...form, dob: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Age (auto)</Label>
-            <Input value={age === "" ? "" : `${age} yrs`} readOnly className="bg-muted" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="className">Class</Label>
-            <Input
-              id="className"
-              value={form.className}
-              onChange={(e) => setForm({ ...form, className: e.target.value })}
-              placeholder="e.g. V"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="parentMobile">Parent Mobile</Label>
-            <Input
-              id="parentMobile"
-              value={form.parentMobile}
-              onChange={(e) => setForm({ ...form, parentMobile: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1.5 md:col-span-2">
-            <Label htmlFor="schoolName">School Name</Label>
-            <Input
-              id="schoolName"
-              value={form.schoolName}
-              onChange={(e) => setForm({ ...form, schoolName: e.target.value })}
-            />
-          </div>
+          ))}
           <DialogFooter className="md:col-span-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
@@ -169,5 +99,41 @@ export function StudentFormDialog({ open, onOpenChange, academicYear, onSubmit }
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function FieldControl({
+  col,
+  value,
+  onChange,
+}: {
+  col: StudentColumn;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label>{col.label}</Label>
+      {col.type === "select" ? (
+        <Select value={value || undefined} onValueChange={onChange}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select…" />
+          </SelectTrigger>
+          <SelectContent>
+            {col.options.map((o) => (
+              <SelectItem key={o} value={o}>
+                {o}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <Input
+          type={col.type === "date" ? "date" : col.type === "number" ? "number" : "text"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
+    </div>
   );
 }
