@@ -355,13 +355,21 @@ export function useStudentsStore() {
 
   const updateColumn = useCallback(
     async (id: string, patch: Partial<Pick<StudentColumn, "label" | "type" | "options" | "position">>) => {
-      const dbPatch: Record<string, unknown> = {};
+      const dbPatch: {
+        label?: string;
+        type?: string;
+        options?: string[];
+        position?: number;
+      } = {};
       if (patch.label !== undefined) dbPatch.label = patch.label;
       if (patch.type !== undefined) dbPatch.type = patch.type;
       if (patch.options !== undefined) dbPatch.options = patch.options;
       if (patch.position !== undefined) dbPatch.position = patch.position;
       const { error } = await supabase.from("student_columns").update(dbPatch).eq("id", id);
-      if (error) return toast.error(error.message);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
       setColumns((prev) =>
         prev
           .map((c) => (c.id === id ? { ...c, ...patch } : c))
