@@ -9,12 +9,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
-import { Plus, BookOpen, LogOut, Shield, Copy } from "lucide-react";
+import { Plus, BookOpen, LogOut, Shield, Copy, Columns3 } from "lucide-react";
 import { YearSidebar } from "@/components/year-sidebar";
 import { StudentsTable } from "@/components/students-table";
 import { StudentFormDialog } from "@/components/student-form-dialog";
 import { CopyYearDialog } from "@/components/copy-year-dialog";
 import { ImportExport } from "@/components/import-export";
+import { ManageColumnsDialog } from "@/components/manage-columns-dialog";
 import { useStudentsStore } from "@/lib/students-store";
 import { useCurrentUser } from "@/lib/use-current-user";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +41,7 @@ function Portal() {
   const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
+  const [colsOpen, setColsOpen] = useState(false);
 
   const counts = useMemo(() => {
     const m: Record<string, number> = {};
@@ -109,6 +111,13 @@ function Portal() {
             </Button>
             <Button
               variant="outline"
+              onClick={() => setColsOpen(true)}
+              title="Add, rename, reorder, or delete columns"
+            >
+              <Columns3 className="h-4 w-4" /> Columns
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => setCopyOpen(true)}
               disabled={store.years.length < 2}
               title="Copy a previous year's roster into the current year"
@@ -124,14 +133,17 @@ function Portal() {
         <section className="mb-6">
           <ImportExport
             students={store.filtered}
+            columns={store.columns}
             academicYear={store.activeYear}
             onImport={store.addStudents}
+            onAddColumn={store.addColumn}
           />
         </section>
 
         <section>
           <StudentsTable
             students={store.filtered}
+            columns={store.columns}
             onUpdate={store.updateStudent}
             onDelete={store.deleteStudent}
           />
@@ -142,6 +154,7 @@ function Portal() {
         open={addOpen}
         onOpenChange={setAddOpen}
         academicYear={store.activeYear}
+        columns={store.columns}
         onSubmit={store.addStudent}
       />
       <CopyYearDialog
@@ -151,6 +164,15 @@ function Portal() {
         activeYear={store.activeYear}
         counts={counts}
         onCopy={store.copyYear}
+      />
+      <ManageColumnsDialog
+        open={colsOpen}
+        onOpenChange={setColsOpen}
+        columns={store.columns}
+        onAdd={store.addColumn}
+        onUpdate={store.updateColumn}
+        onDelete={store.deleteColumn}
+        onMove={store.moveColumn}
       />
       <Toaster richColors position="top-right" />
     </div>

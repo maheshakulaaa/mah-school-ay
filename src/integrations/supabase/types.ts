@@ -56,49 +56,64 @@ export type Database = {
         }
         Relationships: []
       }
-      students: {
+      student_columns: {
         Row: {
-          aadhaar: string
-          academic_year: string
-          class_name: string
           created_at: string
-          dob: string
-          father_name: string
-          gender: string
           id: string
-          name: string
-          parent_mobile: string
-          school_name: string
+          key: string
+          label: string
+          options: Json
+          position: number
+          type: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          aadhaar?: string
-          academic_year: string
-          class_name?: string
           created_at?: string
-          dob?: string
-          father_name?: string
-          gender?: string
           id?: string
-          name?: string
-          parent_mobile?: string
-          school_name?: string
+          key: string
+          label: string
+          options?: Json
+          position?: number
+          type?: string
           updated_at?: string
           user_id: string
         }
         Update: {
-          aadhaar?: string
-          academic_year?: string
-          class_name?: string
           created_at?: string
-          dob?: string
-          father_name?: string
-          gender?: string
           id?: string
-          name?: string
-          parent_mobile?: string
-          school_name?: string
+          key?: string
+          label?: string
+          options?: Json
+          position?: number
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      students: {
+        Row: {
+          academic_year: string
+          created_at: string
+          data: Json
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          academic_year: string
+          created_at?: string
+          data?: Json
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          academic_year?: string
+          created_at?: string
+          data?: Json
+          id?: string
           updated_at?: string
           user_id?: string
         }

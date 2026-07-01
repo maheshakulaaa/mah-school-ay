@@ -31,32 +31,41 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { EditableCell } from "./editable-cell";
-import type { Student } from "@/lib/students-store";
+import type { Student, StudentColumn } from "@/lib/students-store";
 import { toast } from "sonner";
 
 interface Props {
   students: Student[];
-  onUpdate: (id: string, patch: Partial<Student>) => void;
+  columns: StudentColumn[];
+  onUpdate: (id: string, patch: Record<string, string>) => void;
   onDelete: (id: string) => void;
 }
 
 type PageSize = 10 | 20 | 50 | 100 | "all";
 const PAGE_SIZE_OPTIONS: PageSize[] = [10, 20, 50, 100, "all"];
 
-export function StudentsTable({ students, onUpdate, onDelete }: Props) {
+function nameOf(s: Student, cols: StudentColumn[]) {
+  if (s.data.name) return s.data.name;
+  const first = cols[0];
+  return first ? s.data[first.key] ?? "" : "";
+}
+
+export function StudentsTable({ students, columns, onUpdate, onDelete }: Props) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(10);
   const [editMode, setEditMode] = useState(false);
 
+  const sortedCols = useMemo(
+    () => [...columns].sort((a, b) => a.position - b.position),
+    [columns],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return students;
     return students.filter((s) =>
-      [s.name, s.fatherName, s.aadhaar, s.className, s.schoolName, s.parentMobile]
-        .join(" ")
-        .toLowerCase()
-        .includes(q),
+      Object.values(s.data).join(" ").toLowerCase().includes(q),
     );
   }, [students, query]);
 
@@ -68,28 +77,22 @@ export function StudentsTable({ students, onUpdate, onDelete }: Props) {
       ? filtered
       : filtered.slice((safePage - 1) * effectiveSize, safePage * effectiveSize);
 
-  const cell = (value: string, commit: (v: string) => void, opts?: {
-    multiline?: boolean;
-    type?: "text" | "tel" | "date";
-    options?: string[];
-  }) => {
+  const renderCell = (s: Student, col: StudentColumn) => {
+    const value = s.data[col.key] ?? "";
+    const commit = (v: string) => onUpdate(s.id, { [col.key]: v });
     if (!editMode) {
-      const display = value || "—";
       return (
-        <div
-          className={`text-sm text-foreground ${opts?.multiline ? "whitespace-pre-wrap break-words" : "whitespace-nowrap"}`}
-        >
-          {display}
-        </div>
+        <div className="whitespace-nowrap text-sm text-foreground">{value || "—"}</div>
       );
+    }
+    if (col.type === "select") {
+      return <EditableCell value={value} onCommit={commit} options={col.options} />;
     }
     return (
       <EditableCell
         value={value}
         onCommit={commit}
-        multiline={opts?.multiline}
-        type={opts?.type}
-        options={opts?.options}
+        type={col.type === "date" ? "date" : "text"}
       />
     );
   };
@@ -166,33 +169,25 @@ export function StudentsTable({ students, onUpdate, onDelete }: Props) {
           <Table>
             <TableHeader>
               <TableRow className="bg-primary hover:bg-primary">
-                {[
-                  "S.No",
-                  "Name",
-                  "Father Name",
-                  "Gender",
-                  "Aadhaar",
-                  "DOB",
-                  "Age",
-                  "Class",
-                  "School Name",
-                  "Parent Mobile",
-                  ...(editMode ? [""] : []),
-                ].map((h, idx) => (
+                <TableHead className="whitespace-nowrap py-3 text-xs font-semibold uppercase tracking-wide text-primary-foreground">
+                  S.No
+                </TableHead>
+                {sortedCols.map((c) => (
                   <TableHead
-                    key={`${h}-${idx}`}
+                    key={c.id}
                     className="whitespace-nowrap py-3 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
                   >
-                    {h}
+                    {c.label}
                   </TableHead>
                 ))}
+                {editMode && <TableHead />}
               </TableRow>
             </TableHeader>
             <TableBody>
               {pageRows.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={editMode ? 11 : 10}
+                    colSpan={sortedCols.length + 1 + (editMode ? 1 : 0)}
                     className="py-12 text-center text-muted-foreground"
                   >
                     No students yet. Add one or import a CSV to get started.
@@ -204,41 +199,11 @@ export function StudentsTable({ students, onUpdate, onDelete }: Props) {
                     <TableCell className="py-3 text-sm font-medium text-muted-foreground">
                       {(safePage - 1) * effectiveSize + i + 1}
                     </TableCell>
-                    <TableCell className="min-w-[160px] py-2">
-                      {cell(s.name, (v) => onUpdate(s.id, { name: v }), { multiline: true })}
-                    </TableCell>
-                    <TableCell className="min-w-[160px] py-2">
-                      {cell(s.fatherName, (v) => onUpdate(s.id, { fatherName: v }), {
-                        multiline: true,
-                      })}
-                    </TableCell>
-                    <TableCell className="min-w-[110px] py-2">
-                      {cell(s.gender, (v) => onUpdate(s.id, { gender: v as Student["gender"] }), {
-                        options: ["Male", "Female", "Other"],
-                      })}
-                    </TableCell>
-                    <TableCell className="min-w-[150px] py-2">
-                      {cell(s.aadhaar, (v) => onUpdate(s.id, { aadhaar: v }))}
-                    </TableCell>
-                    <TableCell className="min-w-[140px] py-2">
-                      {cell(s.dob, (v) => onUpdate(s.id, { dob: v }), { type: "date" })}
-                    </TableCell>
-                    <TableCell className="py-3 text-sm font-medium">
-                      {s.age === "" ? "—" : `${s.age} yrs`}
-                    </TableCell>
-                    <TableCell className="min-w-[80px] py-2">
-                      {cell(s.className, (v) => onUpdate(s.id, { className: v }))}
-                    </TableCell>
-                    <TableCell className="min-w-[200px] max-w-[260px] py-2">
-                      {cell(s.schoolName, (v) => onUpdate(s.id, { schoolName: v }), {
-                        multiline: true,
-                      })}
-                    </TableCell>
-                    <TableCell className="min-w-[140px] py-2">
-                      {cell(s.parentMobile, (v) => onUpdate(s.id, { parentMobile: v }), {
-                        type: "tel",
-                      })}
-                    </TableCell>
+                    {sortedCols.map((c) => (
+                      <TableCell key={c.id} className="min-w-[140px] py-2">
+                        {renderCell(s, c)}
+                      </TableCell>
+                    ))}
                     {editMode && (
                       <TableCell className="py-2">
                         <AlertDialog>
@@ -256,8 +221,10 @@ export function StudentsTable({ students, onUpdate, onDelete }: Props) {
                               <AlertDialogTitle>Delete student?</AlertDialogTitle>
                               <AlertDialogDescription>
                                 Remove{" "}
-                                <span className="font-semibold">{s.name || "this record"}</span>?
-                                This action cannot be undone.
+                                <span className="font-semibold">
+                                  {nameOf(s, sortedCols) || "this record"}
+                                </span>
+                                ? This action cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
