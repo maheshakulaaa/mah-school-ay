@@ -82,6 +82,36 @@ export function StudentsTable({ students, columns, academicYear, onUpdate, onDel
       ? filtered
       : filtered.slice((safePage - 1) * effectiveSize, safePage * effectiveSize);
 
+  const pageIds = pageRows.map((r) => r.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+  const somePageSelected = pageIds.some((id) => selected.has(id));
+  const togglePageAll = (checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) pageIds.forEach((id) => next.add(id));
+      else pageIds.forEach((id) => next.delete(id));
+      return next;
+    });
+  };
+  const toggleOne = (id: string, checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelected(new Set());
+  const bulkDelete = async () => {
+    const ids = Array.from(selected);
+    const n = await onDeleteMany(ids);
+    if (n > 0) clearSelection();
+  };
+  const clearAll = async () => {
+    const n = await onClearYear(academicYear);
+    if (n > 0) clearSelection();
+  };
+
   const renderCell = (s: Student, col: StudentColumn) => {
     const value = s.data[col.key] ?? "";
     const commit = (v: string) => onUpdate(s.id, { [col.key]: v });
