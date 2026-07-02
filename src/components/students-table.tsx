@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -18,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Search, ChevronLeft, ChevronRight, Lock, Pencil } from "lucide-react";
+import { Trash2, Search, ChevronLeft, ChevronRight, Lock, Pencil, Eraser } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,8 +38,11 @@ import { toast } from "sonner";
 interface Props {
   students: Student[];
   columns: StudentColumn[];
+  academicYear: string;
   onUpdate: (id: string, patch: Record<string, string>) => void;
   onDelete: (id: string) => void;
+  onDeleteMany: (ids: string[]) => Promise<number> | number;
+  onClearYear: (year: string) => Promise<number> | number;
 }
 
 type PageSize = 10 | 20 | 50 | 100 | "all";
