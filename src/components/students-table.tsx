@@ -54,11 +54,12 @@ function nameOf(s: Student, cols: StudentColumn[]) {
   return first ? s.data[first.key] ?? "" : "";
 }
 
-export function StudentsTable({ students, columns, onUpdate, onDelete }: Props) {
+export function StudentsTable({ students, columns, academicYear, onUpdate, onDelete, onDeleteMany, onClearYear }: Props) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(10);
   const [editMode, setEditMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const sortedCols = useMemo(
     () => [...columns].sort((a, b) => a.position - b.position),
