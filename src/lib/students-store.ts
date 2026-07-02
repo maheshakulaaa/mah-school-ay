@@ -540,6 +540,9 @@ export function useStudentsStore() {
   );
 
   const filtered = students.filter((s) => s.academicYear === activeYear);
+  const visibleColumns = columns.filter(
+    (c) => c.academicYear === null || c.academicYear === activeYear,
+  );
 
   return {
     hydrated,
@@ -549,7 +552,8 @@ export function useStudentsStore() {
     addYear,
     students,
     filtered,
-    columns,
+    columns: visibleColumns,
+    allColumns: columns,
     addStudent,
     addStudents,
     updateStudent,
