@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GraduationCap, Calendar, Plus, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { GraduationCap, Calendar, Plus, Users, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
 interface Props {
@@ -18,10 +29,11 @@ interface Props {
   activeYear: string;
   onSelect: (y: string) => void;
   onAddYear: (y: string) => void;
+  onDeleteYear: (y: string) => void;
   counts: Record<string, number>;
 }
 
-export function YearSidebar({ years, activeYear, onSelect, onAddYear, counts }: Props) {
+export function YearSidebar({ years, activeYear, onSelect, onAddYear, onDeleteYear, counts }: Props) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [collapsed, setCollapsed] = useState(false);
@@ -111,32 +123,72 @@ export function YearSidebar({ years, activeYear, onSelect, onAddYear, counts }: 
         <nav className="space-y-1">
           {years.map((y) => {
             const active = y === activeYear;
+            const canDelete = years.length > 1;
             return (
-              <button
+              <div
                 key={y}
-                onClick={() => onSelect(y)}
                 className={cn(
-                  "flex w-full items-center rounded-md py-2.5 text-sm transition",
-                  collapsed ? "md:justify-center md:px-2" : "justify-between px-3",
+                  "group flex items-center gap-1 rounded-md pr-1 transition",
                   active
                     ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 )}
               >
-                <span className="font-medium">{y}</span>
-                <span
+                <button
+                  onClick={() => onSelect(y)}
                   className={cn(
-                    "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs",
-                    collapsed && "hidden md:hidden",
-                    active
-                      ? "bg-white/20 text-sidebar-primary-foreground"
-                      : "bg-sidebar-accent text-sidebar-foreground/70"
+                    "flex flex-1 items-center py-2.5 text-sm",
+                    collapsed ? "md:justify-center md:px-2" : "justify-between px-3"
                   )}
                 >
-                  <Users className="h-3 w-3" />
-                  {counts[y] ?? 0}
-                </span>
-              </button>
+                  <span className="font-medium">{y}</span>
+                  <span
+                    className={cn(
+                      "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs",
+                      collapsed && "hidden md:hidden",
+                      active
+                        ? "bg-white/20 text-sidebar-primary-foreground"
+                        : "bg-sidebar-accent text-sidebar-foreground/70"
+                    )}
+                  >
+                    <Users className="h-3 w-3" />
+                    {counts[y] ?? 0}
+                  </span>
+                </button>
+                {canDelete && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        className={cn(
+                          "rounded p-1 opacity-0 transition hover:bg-black/10 group-hover:opacity-100",
+                          active ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/60 hover:text-destructive",
+                          collapsed && "hidden md:hidden"
+                        )}
+                        aria-label={`Delete academic year ${y}`}
+                        title="Delete academic year"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete academic year {y}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This permanently removes {counts[y] ?? 0} student record
+                          {(counts[y] ?? 0) === 1 ? "" : "s"} from {y}. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onDeleteYear(y)}>
+                          Delete year
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
             );
           })}
         </nav>

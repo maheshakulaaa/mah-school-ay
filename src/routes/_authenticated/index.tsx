@@ -71,6 +71,7 @@ function Portal() {
         activeYear={store.activeYear}
         onSelect={store.setActiveYear}
         onAddYear={store.addYear}
+        onDeleteYear={store.deleteYear}
         counts={counts}
       />
 
@@ -144,8 +145,11 @@ function Portal() {
           <StudentsTable
             students={store.filtered}
             columns={store.columns}
+            academicYear={store.activeYear}
             onUpdate={store.updateStudent}
             onDelete={store.deleteStudent}
+            onDeleteMany={store.deleteStudents}
+            onClearYear={store.clearYear}
           />
         </section>
       </main>

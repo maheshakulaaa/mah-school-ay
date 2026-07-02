@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -18,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Search, ChevronLeft, ChevronRight, Lock, Pencil } from "lucide-react";
+import { Trash2, Search, ChevronLeft, ChevronRight, Lock, Pencil, Eraser } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,8 +38,11 @@ import { toast } from "sonner";
 interface Props {
   students: Student[];
   columns: StudentColumn[];
+  academicYear: string;
   onUpdate: (id: string, patch: Record<string, string>) => void;
   onDelete: (id: string) => void;
+  onDeleteMany: (ids: string[]) => Promise<number> | number;
+  onClearYear: (year: string) => Promise<number> | number;
 }
 
 type PageSize = 10 | 20 | 50 | 100 | "all";
@@ -50,11 +54,12 @@ function nameOf(s: Student, cols: StudentColumn[]) {
   return first ? s.data[first.key] ?? "" : "";
 }
 
-export function StudentsTable({ students, columns, onUpdate, onDelete }: Props) {
+export function StudentsTable({ students, columns, academicYear, onUpdate, onDelete, onDeleteMany, onClearYear }: Props) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(10);
   const [editMode, setEditMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const sortedCols = useMemo(
     () => [...columns].sort((a, b) => a.position - b.position),
@@ -76,6 +81,36 @@ export function StudentsTable({ students, columns, onUpdate, onDelete }: Props) 
     pageSize === "all"
       ? filtered
       : filtered.slice((safePage - 1) * effectiveSize, safePage * effectiveSize);
+
+  const pageIds = pageRows.map((r) => r.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+  const somePageSelected = pageIds.some((id) => selected.has(id));
+  const togglePageAll = (checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) pageIds.forEach((id) => next.add(id));
+      else pageIds.forEach((id) => next.delete(id));
+      return next;
+    });
+  };
+  const toggleOne = (id: string, checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelected(new Set());
+  const bulkDelete = async () => {
+    const ids = Array.from(selected);
+    const n = await onDeleteMany(ids);
+    if (n > 0) clearSelection();
+  };
+  const clearAll = async () => {
+    const n = await onClearYear(academicYear);
+    if (n > 0) clearSelection();
+  };
 
   const renderCell = (s: Student, col: StudentColumn) => {
     const value = s.data[col.key] ?? "";
@@ -164,11 +199,77 @@ export function StudentsTable({ students, columns, onUpdate, onDelete }: Props) 
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-border bg-muted/40 px-3 py-2">
+        <span className="text-sm text-muted-foreground">
+          {selected.size > 0
+            ? `${selected.size} selected`
+            : "Select rows to bulk delete, or clear the whole year"}
+        </span>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {selected.size > 0 && (
+            <>
+              <Button variant="ghost" size="sm" onClick={clearSelection}>
+                Clear selection
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="h-4 w-4" />
+                    Delete selected
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete {selected.size} student{selected.size === 1 ? "" : "s"}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This permanently removes the selected records. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={bulkDelete}>Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          )}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" disabled={students.length === 0}>
+                <Eraser className="h-4 w-4" />
+                Clear {academicYear}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear all students from {academicYear}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This permanently deletes all {students.length} record
+                  {students.length === 1 ? "" : "s"} from {academicYear}. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={clearAll}>Clear year</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
+
       <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="bg-primary hover:bg-primary">
+                <TableHead className="w-10 py-3 text-primary-foreground">
+                  <Checkbox
+                    checked={allPageSelected ? true : somePageSelected ? "indeterminate" : false}
+                    onCheckedChange={(v) => togglePageAll(Boolean(v))}
+                    aria-label="Select all rows on this page"
+                    className="border-primary-foreground data-[state=checked]:bg-primary-foreground data-[state=checked]:text-primary"
+                  />
+                </TableHead>
                 <TableHead className="whitespace-nowrap py-3 text-xs font-semibold uppercase tracking-wide text-primary-foreground">
                   S.No
                 </TableHead>
@@ -187,7 +288,7 @@ export function StudentsTable({ students, columns, onUpdate, onDelete }: Props) 
               {pageRows.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={sortedCols.length + 1 + (editMode ? 1 : 0)}
+                    colSpan={sortedCols.length + 2 + (editMode ? 1 : 0)}
                     className="py-12 text-center text-muted-foreground"
                   >
                     No students yet. Add one or import a CSV to get started.
@@ -195,7 +296,17 @@ export function StudentsTable({ students, columns, onUpdate, onDelete }: Props) 
                 </TableRow>
               ) : (
                 pageRows.map((s, i) => (
-                  <TableRow key={s.id} className="align-top">
+                  <TableRow
+                    key={s.id}
+                    className={selected.has(s.id) ? "align-top bg-primary/5" : "align-top"}
+                  >
+                    <TableCell className="py-3">
+                      <Checkbox
+                        checked={selected.has(s.id)}
+                        onCheckedChange={(v) => toggleOne(s.id, Boolean(v))}
+                        aria-label="Select row"
+                      />
+                    </TableCell>
                     <TableCell className="py-3 text-sm font-medium text-muted-foreground">
                       {(safePage - 1) * effectiveSize + i + 1}
                     </TableCell>
