@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GraduationCap, Calendar, Plus, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { GraduationCap, Calendar, Plus, Users, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
 interface Props {
@@ -18,6 +29,7 @@ interface Props {
   activeYear: string;
   onSelect: (y: string) => void;
   onAddYear: (y: string) => void;
+  onDeleteYear: (y: string) => void;
   counts: Record<string, number>;
 }
 
