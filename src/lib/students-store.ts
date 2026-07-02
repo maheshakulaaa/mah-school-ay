@@ -465,7 +465,7 @@ export function useStudentsStore() {
         const otherYears = years.filter((y) => y !== activeYear);
         if (otherYears.length) {
           const clones = otherYears.map((y) => ({
-            user_id: userId,
+            user_id: userId as string,
             key: col.key,
             label: col.label,
             position: col.position,
