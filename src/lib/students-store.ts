@@ -24,7 +24,7 @@ export interface Student {
 
 export const DEFAULT_YEARS = ["2024-25", "2025-26", "2026-27"];
 
-export const DEFAULT_COLUMN_SEEDS: Omit<StudentColumn, "id">[] = [
+export const DEFAULT_COLUMN_SEEDS: Omit<StudentColumn, "id" | "academicYear">[] = [
   { key: "name", label: "Name", position: 1, type: "text", options: [] },
   { key: "father_name", label: "Father Name", position: 2, type: "text", options: [] },
   { key: "gender", label: "Gender", position: 3, type: "select", options: ["Male", "Female", "Other"] },
