@@ -33,7 +33,7 @@ interface Props {
   counts: Record<string, number>;
 }
 
-export function YearSidebar({ years, activeYear, onSelect, onAddYear, counts }: Props) {
+export function YearSidebar({ years, activeYear, onSelect, onAddYear, onDeleteYear, counts }: Props) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [collapsed, setCollapsed] = useState(false);
