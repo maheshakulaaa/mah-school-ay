@@ -455,18 +455,62 @@ export function useStudentsStore() {
   );
 
   const deleteColumn = useCallback(
-    async (id: string) => {
+    async (id: string, scope: ColumnScope = "all") => {
       const col = columns.find((c) => c.id === id);
       if (!col) return;
+
+      // Per-year delete on a shared column: keep the column for every OTHER year
+      // by cloning it as year-scoped rows, then remove the shared row.
+      if (scope === "year" && col.academicYear === null) {
+        const otherYears = years.filter((y) => y !== activeYear);
+        if (otherYears.length) {
+          const clones = otherYears.map((y) => ({
+            user_id: userId,
+            key: col.key,
+            label: col.label,
+            position: col.position,
+            type: col.type,
+            options: col.options,
+            academic_year: y,
+          }));
+          const { data: inserted, error: insErr } = await supabase
+            .from("student_columns")
+            .insert(clones)
+            .select();
+          if (insErr) {
+            toast.error(insErr.message);
+            return;
+          }
+          const { error: delErr } = await supabase.from("student_columns").delete().eq("id", id);
+          if (delErr) {
+            toast.error(delErr.message);
+            return;
+          }
+          setColumns((prev) =>
+            [
+              ...prev.filter((c) => c.id !== id),
+              ...(inserted ?? []).map((r) => fromDbColumn(r as DbColumn)),
+            ].sort((a, b) => a.position - b.position),
+          );
+          toast.success(`Column "${col.label}" removed from ${activeYear}`);
+          return;
+        }
+        // Only one year exists, fall through to full delete.
+      }
+
       const { error } = await supabase.from("student_columns").delete().eq("id", id);
       if (error) {
         toast.error(error.message);
         return;
       }
       setColumns((prev) => prev.filter((c) => c.id !== id));
-      toast.success(`Column "${col.label}" removed`);
+      toast.success(
+        scope === "year"
+          ? `Column "${col.label}" removed from ${activeYear}`
+          : `Column "${col.label}" removed from all years`,
+      );
     },
-    [columns],
+    [columns, years, activeYear, userId],
   );
 
   const moveColumn = useCallback(
