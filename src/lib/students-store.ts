@@ -98,6 +98,7 @@ interface DbColumn {
   position: number;
   type: string;
   options: unknown;
+  academic_year: string | null;
 }
 
 function fromDbStudent(r: DbStudent): Student {
@@ -119,6 +120,7 @@ function fromDbColumn(r: DbColumn): StudentColumn {
     position: r.position,
     type: (["text", "number", "date", "select"].includes(r.type) ? r.type : "text") as ColumnType,
     options: opts,
+    academicYear: r.academic_year ?? null,
   };
 }
 
