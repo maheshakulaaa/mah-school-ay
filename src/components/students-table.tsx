@@ -288,7 +288,7 @@ export function StudentsTable({ students, columns, academicYear, onUpdate, onDel
               {pageRows.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={sortedCols.length + 1 + (editMode ? 1 : 0)}
+                    colSpan={sortedCols.length + 2 + (editMode ? 1 : 0)}
                     className="py-12 text-center text-muted-foreground"
                   >
                     No students yet. Add one or import a CSV to get started.
@@ -296,7 +296,17 @@ export function StudentsTable({ students, columns, academicYear, onUpdate, onDel
                 </TableRow>
               ) : (
                 pageRows.map((s, i) => (
-                  <TableRow key={s.id} className="align-top">
+                  <TableRow
+                    key={s.id}
+                    className={selected.has(s.id) ? "align-top bg-primary/5" : "align-top"}
+                  >
+                    <TableCell className="py-3">
+                      <Checkbox
+                        checked={selected.has(s.id)}
+                        onCheckedChange={(v) => toggleOne(s.id, Boolean(v))}
+                        aria-label="Select row"
+                      />
+                    </TableCell>
                     <TableCell className="py-3 text-sm font-medium text-muted-foreground">
                       {(safePage - 1) * effectiveSize + i + 1}
                     </TableCell>
