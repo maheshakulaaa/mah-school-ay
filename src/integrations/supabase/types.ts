@@ -58,6 +58,7 @@ export type Database = {
       }
       student_columns: {
         Row: {
+          academic_year: string | null
           created_at: string
           id: string
           key: string
@@ -69,6 +70,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          academic_year?: string | null
           created_at?: string
           id?: string
           key: string
@@ -80,6 +82,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          academic_year?: string | null
           created_at?: string
           id?: string
           key?: string
