@@ -11,7 +11,10 @@ export interface StudentColumn {
   position: number;
   type: ColumnType;
   options: string[];
+  academicYear: string | null;
 }
+
+export type ColumnScope = "all" | "year";
 
 export interface Student {
   id: string;
@@ -21,7 +24,7 @@ export interface Student {
 
 export const DEFAULT_YEARS = ["2024-25", "2025-26", "2026-27"];
 
-export const DEFAULT_COLUMN_SEEDS: Omit<StudentColumn, "id">[] = [
+export const DEFAULT_COLUMN_SEEDS: Omit<StudentColumn, "id" | "academicYear">[] = [
   { key: "name", label: "Name", position: 1, type: "text", options: [] },
   { key: "father_name", label: "Father Name", position: 2, type: "text", options: [] },
   { key: "gender", label: "Gender", position: 3, type: "select", options: ["Male", "Female", "Other"] },
@@ -95,6 +98,7 @@ interface DbColumn {
   position: number;
   type: string;
   options: unknown;
+  academic_year: string | null;
 }
 
 function fromDbStudent(r: DbStudent): Student {
@@ -116,6 +120,7 @@ function fromDbColumn(r: DbColumn): StudentColumn {
     position: r.position,
     type: (["text", "number", "date", "select"].includes(r.type) ? r.type : "text") as ColumnType,
     options: opts,
+    academicYear: r.academic_year ?? null,
   };
 }
 
@@ -381,7 +386,7 @@ export function useStudentsStore() {
   // --- Column management ---
   const addColumn = useCallback(
     async (
-      input: { label: string; type: ColumnType; options?: string[] },
+      input: { label: string; type: ColumnType; options?: string[]; scope?: ColumnScope },
     ): Promise<StudentColumn | null> => {
       if (!userId) return null;
       const label = input.label.trim();
@@ -389,6 +394,8 @@ export function useStudentsStore() {
         toast.error("Column label required");
         return null;
       }
+      const scope: ColumnScope = input.scope ?? "all";
+      const yearScope = scope === "year" ? activeYear : null;
       const existingKeys = new Set(columns.map((c) => c.key));
       let key = slugifyKey(label);
       let n = 2;
@@ -403,6 +410,7 @@ export function useStudentsStore() {
           position,
           type: input.type,
           options: input.type === "select" ? (input.options ?? []) : [],
+          academic_year: yearScope,
         })
         .select()
         .single();
@@ -412,10 +420,12 @@ export function useStudentsStore() {
       }
       const col = fromDbColumn(data as DbColumn);
       setColumns((prev) => [...prev, col].sort((a, b) => a.position - b.position));
-      toast.success(`Column "${label}" added`);
+      toast.success(
+        `Column "${label}" added${yearScope ? ` for ${yearScope}` : " for all years"}`,
+      );
       return col;
     },
-    [userId, columns],
+    [userId, columns, activeYear],
   );
 
   const updateColumn = useCallback(
@@ -445,18 +455,62 @@ export function useStudentsStore() {
   );
 
   const deleteColumn = useCallback(
-    async (id: string) => {
+    async (id: string, scope: ColumnScope = "all") => {
       const col = columns.find((c) => c.id === id);
       if (!col) return;
+
+      // Per-year delete on a shared column: keep the column for every OTHER year
+      // by cloning it as year-scoped rows, then remove the shared row.
+      if (scope === "year" && col.academicYear === null && userId) {
+        const otherYears = years.filter((y) => y !== activeYear);
+        if (otherYears.length) {
+          const clones = otherYears.map((y) => ({
+            user_id: userId as string,
+            key: col.key,
+            label: col.label,
+            position: col.position,
+            type: col.type,
+            options: col.options,
+            academic_year: y,
+          }));
+          const { data: inserted, error: insErr } = await supabase
+            .from("student_columns")
+            .insert(clones)
+            .select();
+          if (insErr) {
+            toast.error(insErr.message);
+            return;
+          }
+          const { error: delErr } = await supabase.from("student_columns").delete().eq("id", id);
+          if (delErr) {
+            toast.error(delErr.message);
+            return;
+          }
+          setColumns((prev) =>
+            [
+              ...prev.filter((c) => c.id !== id),
+              ...(inserted ?? []).map((r) => fromDbColumn(r as DbColumn)),
+            ].sort((a, b) => a.position - b.position),
+          );
+          toast.success(`Column "${col.label}" removed from ${activeYear}`);
+          return;
+        }
+        // Only one year exists, fall through to full delete.
+      }
+
       const { error } = await supabase.from("student_columns").delete().eq("id", id);
       if (error) {
         toast.error(error.message);
         return;
       }
       setColumns((prev) => prev.filter((c) => c.id !== id));
-      toast.success(`Column "${col.label}" removed`);
+      toast.success(
+        scope === "year"
+          ? `Column "${col.label}" removed from ${activeYear}`
+          : `Column "${col.label}" removed from all years`,
+      );
     },
-    [columns],
+    [columns, years, activeYear, userId],
   );
 
   const moveColumn = useCallback(
@@ -486,6 +540,9 @@ export function useStudentsStore() {
   );
 
   const filtered = students.filter((s) => s.academicYear === activeYear);
+  const visibleColumns = columns.filter(
+    (c) => c.academicYear === null || c.academicYear === activeYear,
+  );
 
   return {
     hydrated,
@@ -495,7 +552,8 @@ export function useStudentsStore() {
     addYear,
     students,
     filtered,
-    columns,
+    columns: visibleColumns,
+    allColumns: columns,
     addStudent,
     addStudents,
     updateStudent,

@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,23 +30,39 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Trash2, ArrowUp, ArrowDown, Pencil } from "lucide-react";
-import type { ColumnType, StudentColumn } from "@/lib/students-store";
+import { Plus, Trash2, ArrowUp, ArrowDown, Pencil, Globe, CalendarClock } from "lucide-react";
+import type { ColumnScope, ColumnType, StudentColumn } from "@/lib/students-store";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   columns: StudentColumn[];
-  onAdd: (input: { label: string; type: ColumnType; options?: string[] }) => Promise<StudentColumn | null>;
+  activeYear: string;
+  onAdd: (input: {
+    label: string;
+    type: ColumnType;
+    options?: string[];
+    scope?: ColumnScope;
+  }) => Promise<StudentColumn | null>;
   onUpdate: (id: string, patch: Partial<Pick<StudentColumn, "label" | "type" | "options">>) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onDelete: (id: string, scope?: ColumnScope) => Promise<void>;
   onMove: (id: string, dir: -1 | 1) => Promise<void>;
 }
 
-export function ManageColumnsDialog({ open, onOpenChange, columns, onAdd, onUpdate, onDelete, onMove }: Props) {
+export function ManageColumnsDialog({
+  open,
+  onOpenChange,
+  columns,
+  activeYear,
+  onAdd,
+  onUpdate,
+  onDelete,
+  onMove,
+}: Props) {
   const [label, setLabel] = useState("");
   const [type, setType] = useState<ColumnType>("text");
   const [optionsText, setOptionsText] = useState("");
+  const [scope, setScope] = useState<ColumnScope>("all");
 
   const sorted = [...columns].sort((a, b) => a.position - b.position);
 
@@ -55,11 +72,12 @@ export function ManageColumnsDialog({ open, onOpenChange, columns, onAdd, onUpda
       type === "select"
         ? optionsText.split(/[\n,]/).map((o) => o.trim()).filter(Boolean)
         : undefined;
-    const created = await onAdd({ label: label.trim(), type, options });
+    const created = await onAdd({ label: label.trim(), type, options, scope });
     if (created) {
       setLabel("");
       setType("text");
       setOptionsText("");
+      setScope("all");
     }
   };
 
@@ -69,7 +87,8 @@ export function ManageColumnsDialog({ open, onOpenChange, columns, onAdd, onUpda
         <DialogHeader>
           <DialogTitle>Manage columns</DialogTitle>
           <DialogDescription>
-            Add, rename, reorder, or delete columns. Deleting a column removes its data from every student.
+            Add, rename, reorder, or delete columns. Choose whether a change applies to every
+            academic year or only <span className="font-medium text-foreground">{activeYear}</span>.
           </DialogDescription>
         </DialogHeader>
 
@@ -99,6 +118,27 @@ export function ManageColumnsDialog({ open, onOpenChange, columns, onAdd, onUpda
                 <Plus className="h-4 w-4" /> Add
               </Button>
             </div>
+
+            <div className="mt-3">
+              <Label className="text-xs text-muted-foreground">Apply to</Label>
+              <RadioGroup
+                value={scope}
+                onValueChange={(v) => setScope(v as ColumnScope)}
+                className="mt-1 flex flex-wrap gap-4"
+              >
+                <label className="flex items-center gap-2 text-sm">
+                  <RadioGroupItem value="all" id="scope-all" />
+                  <Globe className="h-4 w-4 text-muted-foreground" />
+                  All academic years
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <RadioGroupItem value="year" id="scope-year" />
+                  <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                  Only {activeYear}
+                </label>
+              </RadioGroup>
+            </div>
+
             {type === "select" && (
               <div className="mt-2">
                 <Label className="text-xs text-muted-foreground">
@@ -120,6 +160,7 @@ export function ManageColumnsDialog({ open, onOpenChange, columns, onAdd, onUpda
               <ColumnRow
                 key={c.id}
                 col={c}
+                activeYear={activeYear}
                 first={i === 0}
                 last={i === sorted.length - 1}
                 onUpdate={onUpdate}
@@ -145,6 +186,7 @@ export function ManageColumnsDialog({ open, onOpenChange, columns, onAdd, onUpda
 
 function ColumnRow({
   col,
+  activeYear,
   first,
   last,
   onUpdate,
@@ -152,6 +194,7 @@ function ColumnRow({
   onMove,
 }: {
   col: StudentColumn;
+  activeYear: string;
   first: boolean;
   last: boolean;
   onUpdate: Props["onUpdate"];
@@ -162,6 +205,12 @@ function ColumnRow({
   const [label, setLabel] = useState(col.label);
   const [type, setType] = useState<ColumnType>(col.type);
   const [optionsText, setOptionsText] = useState(col.options.join(", "));
+  const [deleteScope, setDeleteScope] = useState<ColumnScope>(
+    col.academicYear === null ? "all" : "year",
+  );
+
+  const isShared = col.academicYear === null;
+  const scopeLabel = isShared ? "All years" : col.academicYear;
 
   const save = async () => {
     const options =
@@ -218,7 +267,21 @@ function ColumnRow({
         </Button>
       </div>
       <div className="flex-1">
-        <div className="font-medium text-sm">{col.label}</div>
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm">{col.label}</span>
+          <span
+            className={
+              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide " +
+              (isShared
+                ? "bg-primary/10 text-primary"
+                : "bg-amber-500/15 text-amber-700 dark:text-amber-400")
+            }
+            title={isShared ? "Shared across all years" : `Only in ${col.academicYear}`}
+          >
+            {isShared ? <Globe className="h-3 w-3" /> : <CalendarClock className="h-3 w-3" />}
+            {scopeLabel}
+          </span>
+        </div>
         <div className="text-xs text-muted-foreground">
           {col.type}
           {col.type === "select" && col.options.length > 0 && ` · ${col.options.join(", ")}`}
@@ -237,13 +300,50 @@ function ColumnRow({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete column "{col.label}"?</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the column and its stored values from every student record. This action
-              cannot be undone.
+              Choose the scope of this deletion. Stored values remain in each student record until
+              you remove the column from that year too.
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {isShared ? (
+            <RadioGroup
+              value={deleteScope}
+              onValueChange={(v) => setDeleteScope(v as ColumnScope)}
+              className="space-y-2 py-1"
+            >
+              <label className="flex items-start gap-2 rounded-md border p-2 text-sm">
+                <RadioGroupItem value="all" className="mt-0.5" />
+                <div>
+                  <div className="font-medium">Remove from all academic years</div>
+                  <div className="text-xs text-muted-foreground">
+                    The column disappears everywhere.
+                  </div>
+                </div>
+              </label>
+              <label className="flex items-start gap-2 rounded-md border p-2 text-sm">
+                <RadioGroupItem value="year" className="mt-0.5" />
+                <div>
+                  <div className="font-medium">Remove only from {activeYear}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Other academic years will keep this column.
+                  </div>
+                </div>
+              </label>
+            </RadioGroup>
+          ) : (
+            <p className="py-1 text-sm text-muted-foreground">
+              This column exists only in <span className="font-medium text-foreground">{col.academicYear}</span> and
+              will be removed from that year.
+            </p>
+          )}
+
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => onDelete(col.id)}>Delete</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => onDelete(col.id, isShared ? deleteScope : "all")}
+            >
+              Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

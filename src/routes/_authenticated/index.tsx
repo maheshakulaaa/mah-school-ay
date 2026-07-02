@@ -172,7 +172,8 @@ function Portal() {
       <ManageColumnsDialog
         open={colsOpen}
         onOpenChange={setColsOpen}
-        columns={store.columns}
+        columns={store.allColumns}
+        activeYear={store.activeYear}
         onAdd={store.addColumn}
         onUpdate={store.updateColumn}
         onDelete={store.deleteColumn}
