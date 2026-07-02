@@ -256,6 +256,71 @@ export function useStudentsStore() {
     setStudents((prev) => prev.filter((s) => s.id !== id));
   }, []);
 
+  const deleteStudents = useCallback(async (ids: string[]) => {
+    if (!ids.length) return 0;
+    const { error } = await supabase.from("students").delete().in("id", ids);
+    if (error) {
+      toast.error(error.message);
+      return 0;
+    }
+    const set = new Set(ids);
+    setStudents((prev) => prev.filter((s) => !set.has(s.id)));
+    toast.success(`Deleted ${ids.length} student${ids.length === 1 ? "" : "s"}`);
+    return ids.length;
+  }, []);
+
+  const clearYear = useCallback(
+    async (year: string) => {
+      if (!userId) return 0;
+      const target = students.filter((s) => s.academicYear === year);
+      if (!target.length) {
+        toast.info(`No students in ${year}`);
+        return 0;
+      }
+      const { error } = await supabase
+        .from("students")
+        .delete()
+        .eq("user_id", userId)
+        .eq("academic_year", year);
+      if (error) {
+        toast.error(error.message);
+        return 0;
+      }
+      setStudents((prev) => prev.filter((s) => s.academicYear !== year));
+      toast.success(`Cleared ${target.length} record${target.length === 1 ? "" : "s"} from ${year}`);
+      return target.length;
+    },
+    [userId, students],
+  );
+
+  const deleteYear = useCallback(
+    async (year: string) => {
+      if (!userId) return;
+      if (years.length <= 1) {
+        toast.error("At least one academic year is required");
+        return;
+      }
+      const { error: sErr } = await supabase
+        .from("students")
+        .delete()
+        .eq("user_id", userId)
+        .eq("academic_year", year);
+      if (sErr) return toast.error(sErr.message);
+      const { error: yErr } = await supabase
+        .from("academic_years")
+        .delete()
+        .eq("user_id", userId)
+        .eq("year", year);
+      if (yErr) return toast.error(yErr.message);
+      setStudents((prev) => prev.filter((s) => s.academicYear !== year));
+      const nextYears = years.filter((y) => y !== year);
+      setYears(nextYears);
+      setActiveYearState((cur) => (cur === year ? nextYears[0] ?? "" : cur));
+      toast.success(`Removed academic year ${year}`);
+    },
+    [userId, years],
+  );
+
   const copyYear = useCallback(
     async (fromYear: string, toYear: string) => {
       if (!userId) return 0;
