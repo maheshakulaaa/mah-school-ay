@@ -386,7 +386,7 @@ export function useStudentsStore() {
   // --- Column management ---
   const addColumn = useCallback(
     async (
-      input: { label: string; type: ColumnType; options?: string[] },
+      input: { label: string; type: ColumnType; options?: string[]; scope?: ColumnScope },
     ): Promise<StudentColumn | null> => {
       if (!userId) return null;
       const label = input.label.trim();
@@ -394,6 +394,8 @@ export function useStudentsStore() {
         toast.error("Column label required");
         return null;
       }
+      const scope: ColumnScope = input.scope ?? "all";
+      const yearScope = scope === "year" ? activeYear : null;
       const existingKeys = new Set(columns.map((c) => c.key));
       let key = slugifyKey(label);
       let n = 2;
@@ -408,6 +410,7 @@ export function useStudentsStore() {
           position,
           type: input.type,
           options: input.type === "select" ? (input.options ?? []) : [],
+          academic_year: yearScope,
         })
         .select()
         .single();
@@ -417,10 +420,12 @@ export function useStudentsStore() {
       }
       const col = fromDbColumn(data as DbColumn);
       setColumns((prev) => [...prev, col].sort((a, b) => a.position - b.position));
-      toast.success(`Column "${label}" added`);
+      toast.success(
+        `Column "${label}" added${yearScope ? ` for ${yearScope}` : " for all years"}`,
+      );
       return col;
     },
-    [userId, columns],
+    [userId, columns, activeYear],
   );
 
   const updateColumn = useCallback(
