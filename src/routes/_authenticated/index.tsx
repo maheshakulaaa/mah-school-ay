@@ -71,6 +71,7 @@ function Portal() {
         activeYear={store.activeYear}
         onSelect={store.setActiveYear}
         onAddYear={store.addYear}
+        onDeleteYear={store.deleteYear}
         counts={counts}
       />
 
