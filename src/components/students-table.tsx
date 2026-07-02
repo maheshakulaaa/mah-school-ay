@@ -199,11 +199,77 @@ export function StudentsTable({ students, columns, academicYear, onUpdate, onDel
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-border bg-muted/40 px-3 py-2">
+        <span className="text-sm text-muted-foreground">
+          {selected.size > 0
+            ? `${selected.size} selected`
+            : "Select rows to bulk delete, or clear the whole year"}
+        </span>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {selected.size > 0 && (
+            <>
+              <Button variant="ghost" size="sm" onClick={clearSelection}>
+                Clear selection
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="h-4 w-4" />
+                    Delete selected
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete {selected.size} student{selected.size === 1 ? "" : "s"}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This permanently removes the selected records. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={bulkDelete}>Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          )}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" disabled={students.length === 0}>
+                <Eraser className="h-4 w-4" />
+                Clear {academicYear}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear all students from {academicYear}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This permanently deletes all {students.length} record
+                  {students.length === 1 ? "" : "s"} from {academicYear}. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={clearAll}>Clear year</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
+
       <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="bg-primary hover:bg-primary">
+                <TableHead className="w-10 py-3 text-primary-foreground">
+                  <Checkbox
+                    checked={allPageSelected ? true : somePageSelected ? "indeterminate" : false}
+                    onCheckedChange={(v) => togglePageAll(Boolean(v))}
+                    aria-label="Select all rows on this page"
+                    className="border-primary-foreground data-[state=checked]:bg-primary-foreground data-[state=checked]:text-primary"
+                  />
+                </TableHead>
                 <TableHead className="whitespace-nowrap py-3 text-xs font-semibold uppercase tracking-wide text-primary-foreground">
                   S.No
                 </TableHead>
