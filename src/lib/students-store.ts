@@ -461,7 +461,7 @@ export function useStudentsStore() {
 
       // Per-year delete on a shared column: keep the column for every OTHER year
       // by cloning it as year-scoped rows, then remove the shared row.
-      if (scope === "year" && col.academicYear === null) {
+      if (scope === "year" && col.academicYear === null && userId) {
         const otherYears = years.filter((y) => y !== activeYear);
         if (otherYears.length) {
           const clones = otherYears.map((y) => ({
