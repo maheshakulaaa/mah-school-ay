@@ -11,7 +11,10 @@ export interface StudentColumn {
   position: number;
   type: ColumnType;
   options: string[];
+  academicYear: string | null;
 }
+
+export type ColumnScope = "all" | "year";
 
 export interface Student {
   id: string;
