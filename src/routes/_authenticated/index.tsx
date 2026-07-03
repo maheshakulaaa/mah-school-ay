@@ -72,27 +72,28 @@ function Portal() {
         onSelect={store.setActiveYear}
         onAddYear={store.addYear}
         onDeleteYear={store.deleteYear}
+        onRenameYear={store.renameYear}
         counts={counts}
       />
 
-      <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
+      <main className="flex-1 px-3 py-5 md:px-8 md:py-8">
         <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
+          <div className="min-w-0">
             <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary">
-              <BookOpen className="h-3.5 w-3.5" />
+              <BookOpen className="h-3.5 w-3.5 shrink-0" />
               Register
             </div>
-            <h2 className="font-display text-3xl font-semibold tracking-tight text-foreground">
+            <h2 className="truncate font-display text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
               Students · {store.activeYear}
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 truncate text-sm text-muted-foreground">
               {user?.fullName ? `Signed in as ${user.fullName}` : user?.email}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="md:hidden">
               <Select value={store.activeYear} onValueChange={store.setActiveYear}>
-                <SelectTrigger className="w-36">
+                <SelectTrigger className="w-32">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -103,30 +104,34 @@ function Portal() {
               </Select>
             </div>
             {user?.isAdmin && (
-              <Button asChild variant="outline">
-                <Link to="/admin"><Shield className="h-4 w-4" /> Admin</Link>
+              <Button asChild variant="outline" size="sm" className="md:size-default">
+                <Link to="/admin"><Shield className="h-4 w-4" /> <span className="hidden sm:inline">Admin</span></Link>
               </Button>
             )}
-            <Button variant="outline" onClick={signOut}>
-              <LogOut className="h-4 w-4" /> Sign out
+            <Button variant="outline" size="sm" className="md:size-default" onClick={signOut}>
+              <LogOut className="h-4 w-4" /> <span className="hidden sm:inline">Sign out</span>
             </Button>
             <Button
               variant="outline"
+              size="sm"
+              className="md:size-default"
               onClick={() => setColsOpen(true)}
               title="Add, rename, reorder, or delete columns"
             >
-              <Columns3 className="h-4 w-4" /> Columns
+              <Columns3 className="h-4 w-4" /> <span className="hidden sm:inline">Columns</span>
             </Button>
             <Button
               variant="outline"
+              size="sm"
+              className="md:size-default"
               onClick={() => setCopyOpen(true)}
               disabled={store.years.length < 2}
               title="Copy a previous year's roster into the current year"
             >
-              <Copy className="h-4 w-4" /> Copy from year
+              <Copy className="h-4 w-4" /> <span className="hidden sm:inline">Copy from year</span>
             </Button>
-            <Button onClick={() => setAddOpen(true)}>
-              <Plus className="h-4 w-4" /> Add Student
+            <Button size="sm" className="md:size-default" onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Add Student</span>
             </Button>
           </div>
         </header>
