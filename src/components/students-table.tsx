@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Search, ChevronLeft, ChevronRight, Lock, Pencil, Eraser } from "lucide-react";
+import { Trash2, Search, ChevronLeft, ChevronRight, Lock, Pencil, Eraser, CalendarDays } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -116,6 +117,17 @@ export function StudentsTable({ students, columns, academicYear, onUpdate, onDel
     const value = s.data[col.key] ?? "";
     const commit = (v: string) => onUpdate(s.id, { [col.key]: v });
     if (!editMode) {
+      if (col.key === "name") {
+        return (
+          <Link
+            to="/students/$studentId/activities"
+            params={{ studentId: s.id }}
+            className="whitespace-nowrap text-sm font-medium text-primary underline-offset-2 hover:underline"
+          >
+            {value || "—"}
+          </Link>
+        );
+      }
       return (
         <div className="whitespace-nowrap text-sm text-foreground">{value || "—"}</div>
       );
@@ -283,14 +295,16 @@ export function StudentsTable({ students, columns, academicYear, onUpdate, onDel
                     {c.label}
                   </TableHead>
                 ))}
-                {editMode && <TableHead />}
+                <TableHead className="whitespace-nowrap py-3 text-right text-xs font-semibold uppercase tracking-wide text-primary-foreground">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {pageRows.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={sortedCols.length + 2 + (editMode ? 1 : 0)}
+                    colSpan={sortedCols.length + 3}
                     className="py-12 text-center text-muted-foreground"
                   >
                     No students yet. Add one or import a CSV to get started.
@@ -317,44 +331,61 @@ export function StudentsTable({ students, columns, academicYear, onUpdate, onDel
                         {renderCell(s, c)}
                       </TableCell>
                     ))}
-                    {editMode && (
-                      <TableCell className="py-2">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete student?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Remove{" "}
-                                <span className="font-semibold">
-                                  {nameOf(s, sortedCols) || "this record"}
-                                </span>
-                                ? This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => {
-                                  onDelete(s.id);
-                                  toast.success("Student deleted");
-                                }}
+                    <TableCell className="py-2 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          asChild
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          title="Daily activities"
+                        >
+                          <Link
+                            to="/students/$studentId/activities"
+                            params={{ studentId: s.id }}
+                            aria-label="Open daily activities"
+                          >
+                            <CalendarDays className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        {editMode && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
                               >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </TableCell>
-                    )}
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete student?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Remove{" "}
+                                  <span className="font-semibold">
+                                    {nameOf(s, sortedCols) || "this record"}
+                                  </span>
+                                  ? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter className="gap-2 sm:gap-2">
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => {
+                                    onDelete(s.id);
+                                    toast.success("Student deleted");
+                                  }}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
