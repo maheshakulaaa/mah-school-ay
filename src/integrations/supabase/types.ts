@@ -35,6 +35,33 @@ export type Database = {
         }
         Relationships: []
       }
+      activity_types: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          position: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          position?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          position?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -55,6 +82,60 @@ export type Database = {
           id?: string
         }
         Relationships: []
+      }
+      student_activities: {
+        Row: {
+          activity_date: string
+          activity_type_id: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          score: number | null
+          status: string
+          student_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_date: string
+          activity_type_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          score?: number | null
+          status?: string
+          student_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_date?: string
+          activity_type_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          score?: number | null
+          status?: string
+          student_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_activities_activity_type_id_fkey"
+            columns: ["activity_type_id"]
+            isOneToOne: false
+            referencedRelation: "activity_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_activities_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       student_columns: {
         Row: {
