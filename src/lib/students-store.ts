@@ -326,6 +326,49 @@ export function useStudentsStore() {
     [userId, years],
   );
 
+  const renameYear = useCallback(
+    async (oldYear: string, newYear: string) => {
+      if (!userId) return;
+      const target = newYear.trim();
+      if (!/^\d{4}-\d{2}$/.test(target)) {
+        toast.error("Format must be YYYY-YY (e.g. 2027-28)");
+        return;
+      }
+      if (target === oldYear) return;
+      if (years.includes(target)) {
+        toast.error(`${target} already exists`);
+        return;
+      }
+      const { error: yErr } = await supabase
+        .from("academic_years")
+        .update({ year: target })
+        .eq("user_id", userId)
+        .eq("year", oldYear);
+      if (yErr) return toast.error(yErr.message);
+      const { error: sErr } = await supabase
+        .from("students")
+        .update({ academic_year: target })
+        .eq("user_id", userId)
+        .eq("academic_year", oldYear);
+      if (sErr) return toast.error(sErr.message);
+      await supabase
+        .from("student_columns")
+        .update({ academic_year: target })
+        .eq("user_id", userId)
+        .eq("academic_year", oldYear);
+      setYears((prev) => prev.map((y) => (y === oldYear ? target : y)).sort());
+      setStudents((prev) =>
+        prev.map((s) => (s.academicYear === oldYear ? { ...s, academicYear: target } : s)),
+      );
+      setColumns((prev) =>
+        prev.map((c) => (c.academicYear === oldYear ? { ...c, academicYear: target } : c)),
+      );
+      setActiveYearState((cur) => (cur === oldYear ? target : cur));
+      toast.success(`Renamed ${oldYear} → ${target}`);
+    },
+    [userId, years],
+  );
+
   const copyYear = useCallback(
     async (fromYear: string, toYear: string) => {
       if (!userId) return 0;
@@ -562,6 +605,7 @@ export function useStudentsStore() {
     deleteStudents,
     clearYear,
     deleteYear,
+    renameYear,
     addColumn,
     updateColumn,
     deleteColumn,

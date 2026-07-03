@@ -215,7 +215,8 @@ export function StudentsTable({ students, columns, academicYear, onUpdate, onDel
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" size="sm">
                     <Trash2 className="h-4 w-4" />
-                    Delete selected
+                    <span className="hidden sm:inline">Delete selected</span>
+                    <span className="sm:hidden">Delete</span>
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
@@ -237,7 +238,8 @@ export function StudentsTable({ students, columns, academicYear, onUpdate, onDel
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" disabled={students.length === 0}>
                 <Eraser className="h-4 w-4" />
-                Clear {academicYear}
+                <span className="hidden sm:inline">Clear {academicYear}</span>
+                <span className="sm:hidden">Clear year</span>
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
