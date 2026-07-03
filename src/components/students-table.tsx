@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Search, ChevronLeft, ChevronRight, Lock, Pencil, Eraser } from "lucide-react";
+import { Trash2, Search, ChevronLeft, ChevronRight, Lock, Pencil, Eraser, CalendarDays } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -116,6 +117,17 @@ export function StudentsTable({ students, columns, academicYear, onUpdate, onDel
     const value = s.data[col.key] ?? "";
     const commit = (v: string) => onUpdate(s.id, { [col.key]: v });
     if (!editMode) {
+      if (col.key === "name") {
+        return (
+          <Link
+            to="/students/$studentId/activities"
+            params={{ studentId: s.id }}
+            className="whitespace-nowrap text-sm font-medium text-primary underline-offset-2 hover:underline"
+          >
+            {value || "—"}
+          </Link>
+        );
+      }
       return (
         <div className="whitespace-nowrap text-sm text-foreground">{value || "—"}</div>
       );
