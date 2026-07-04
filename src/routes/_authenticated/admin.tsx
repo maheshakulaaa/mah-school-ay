@@ -128,6 +128,31 @@ function AdminPage() {
     }
   };
 
+  const toggleActive = async (u: UserRow) => {
+    try {
+      await activeFn({ data: { userId: u.id, active: u.banned } });
+      toast.success(u.banned ? "User activated" : "User deactivated");
+      refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+    }
+  };
+
+  const submitPassword = async () => {
+    if (!pwUser) return;
+    setPwSubmitting(true);
+    try {
+      await passwordFn({ data: { userId: pwUser.id, password: pwValue } });
+      toast.success("Password updated");
+      setPwUser(null);
+      setPwValue("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setPwSubmitting(false);
+    }
+  };
+
   if (meLoading || !user?.isAdmin) {
     return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading…</div>;
   }
