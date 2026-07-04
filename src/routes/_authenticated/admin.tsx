@@ -1,7 +1,13 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { createUserAsAdmin, listUsersAsAdmin, deleteUserAsAdmin } from "@/lib/admin.functions";
+import {
+  createUserAsAdmin,
+  listUsersAsAdmin,
+  deleteUserAsAdmin,
+  updateUserPasswordAsAdmin,
+  setUserActiveAsAdmin,
+} from "@/lib/admin.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,8 +17,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2, UserPlus, Shield } from "lucide-react";
+import { ArrowLeft, Trash2, UserPlus, Shield, KeyRound, UserCheck, UserX } from "lucide-react";
 import { useCurrentUser } from "@/lib/use-current-user";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
