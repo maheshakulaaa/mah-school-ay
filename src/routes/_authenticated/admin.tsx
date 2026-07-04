@@ -1,7 +1,13 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { createUserAsAdmin, listUsersAsAdmin, deleteUserAsAdmin } from "@/lib/admin.functions";
+import {
+  createUserAsAdmin,
+  listUsersAsAdmin,
+  deleteUserAsAdmin,
+  updateUserPasswordAsAdmin,
+  setUserActiveAsAdmin,
+} from "@/lib/admin.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,8 +17,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2, UserPlus, Shield } from "lucide-react";
+import { ArrowLeft, Trash2, UserPlus, Shield, KeyRound, UserCheck, UserX } from "lucide-react";
 import { useCurrentUser } from "@/lib/use-current-user";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +50,8 @@ interface UserRow {
   fullName: string | null;
   createdAt: string;
   roles: string[];
+  banned: boolean;
+  emailConfirmed: boolean;
 }
 
 function AdminPage() {
@@ -44,6 +60,12 @@ function AdminPage() {
   const listFn = useServerFn(listUsersAsAdmin);
   const createFn = useServerFn(createUserAsAdmin);
   const deleteFn = useServerFn(deleteUserAsAdmin);
+  const passwordFn = useServerFn(updateUserPasswordAsAdmin);
+  const activeFn = useServerFn(setUserActiveAsAdmin);
+
+  const [pwUser, setPwUser] = useState<UserRow | null>(null);
+  const [pwValue, setPwValue] = useState("");
+  const [pwSubmitting, setPwSubmitting] = useState(false);
 
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,6 +125,31 @@ function AdminPage() {
       refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
+    }
+  };
+
+  const toggleActive = async (u: UserRow) => {
+    try {
+      await activeFn({ data: { userId: u.id, active: u.banned } });
+      toast.success(u.banned ? "User activated" : "User deactivated");
+      refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+    }
+  };
+
+  const submitPassword = async () => {
+    if (!pwUser) return;
+    setPwSubmitting(true);
+    try {
+      await passwordFn({ data: { userId: pwUser.id, password: pwValue } });
+      toast.success("Password updated");
+      setPwUser(null);
+      setPwValue("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setPwSubmitting(false);
     }
   };
 
@@ -167,15 +214,16 @@ function AdminPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Roles</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead></TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Loading…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Loading…</TableCell></TableRow>
               ) : users.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">No users yet</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">No users yet</TableCell></TableRow>
               ) : (
                 users.map((u) => (
                   <TableRow key={u.id}>
@@ -188,31 +236,78 @@ function AdminPage() {
                         ))}
                       </div>
                     </TableCell>
+                    <TableCell>
+                      <Badge variant={u.banned ? "destructive" : "outline"}>
+                        {u.banned ? "Inactive" : "Active"}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(u.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell>
-                      {u.id !== user.id && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete {u.email}?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This permanently removes the user and all their student records.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => remove(u.id)}>Delete</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Reset password"
+                          onClick={() => { setPwUser(u); setPwValue(""); }}
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
+                        {u.id !== user.id && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title={u.banned ? "Activate user" : "Deactivate user"}
+                                className={u.banned ? "text-primary" : "text-muted-foreground"}
+                              >
+                                {u.banned ? <UserCheck className="h-4 w-4" /> : <UserX className="h-4 w-4" />}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="max-w-[calc(100vw-2rem)]">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  {u.banned ? "Activate" : "Deactivate"} {u.email}?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  {u.banned
+                                    ? "The user will be able to sign in again."
+                                    : "The user will be signed out and blocked from signing in until reactivated."}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => toggleActive(u)}>
+                                  {u.banned ? "Activate" : "Deactivate"}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                        {u.id !== user.id && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" title="Delete user" className="text-muted-foreground hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="max-w-[calc(100vw-2rem)]">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete {u.email}?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This permanently removes the user and all their student records.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => remove(u.id)}>Delete</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -221,6 +316,35 @@ function AdminPage() {
           </Table>
         </Card>
       </div>
+
+      <Dialog open={!!pwUser} onOpenChange={(o) => { if (!o) { setPwUser(null); setPwValue(""); } }}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {pwUser?.email}. They will use this on next sign-in.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="new-pw">New password</Label>
+            <Input
+              id="new-pw"
+              type="text"
+              minLength={6}
+              value={pwValue}
+              onChange={(e) => setPwValue(e.target.value)}
+              placeholder="At least 6 characters"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setPwUser(null); setPwValue(""); }}>Cancel</Button>
+            <Button onClick={submitPassword} disabled={pwSubmitting || pwValue.length < 6}>
+              {pwSubmitting ? "Saving…" : "Update password"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Toaster richColors position="top-right" />
     </div>
   );
