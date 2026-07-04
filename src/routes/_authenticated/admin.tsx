@@ -50,6 +50,8 @@ interface UserRow {
   fullName: string | null;
   createdAt: string;
   roles: string[];
+  banned: boolean;
+  emailConfirmed: boolean;
 }
 
 function AdminPage() {
@@ -58,6 +60,12 @@ function AdminPage() {
   const listFn = useServerFn(listUsersAsAdmin);
   const createFn = useServerFn(createUserAsAdmin);
   const deleteFn = useServerFn(deleteUserAsAdmin);
+  const passwordFn = useServerFn(updateUserPasswordAsAdmin);
+  const activeFn = useServerFn(setUserActiveAsAdmin);
+
+  const [pwUser, setPwUser] = useState<UserRow | null>(null);
+  const [pwValue, setPwValue] = useState("");
+  const [pwSubmitting, setPwSubmitting] = useState(false);
 
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
